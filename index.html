@@ -1,0 +1,1975 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>OPERASI FAJAR — Tactical Breach Prototype</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0b0f0d;
+    --panel:#121815;
+    --panel-line:#2a352f;
+    --amber:#c9a24b;
+    --amber-dim:#7a662f;
+    --red:#b3453a;
+    --blue:#5c8fb0;
+    --teal:#5fae8e;
+    --ink:#d8d3c4;
+    --ink-dim:#8a8f86;
+  }
+  *{box-sizing:border-box; -webkit-user-select:none; user-select:none; -webkit-tap-highlight-color:transparent;}
+  html,body{
+    margin:0; padding:0; width:100%; height:100%; background:#000;
+    font-family:'Rajdhani', sans-serif; color:var(--ink); overflow:hidden;
+    overscroll-behavior:none; touch-action:none;
+  }
+  .mono{ font-family:'Share Tech Mono', monospace; }
+
+  /* #app centers a fixed-aspect landscape viewport and letterboxes it with
+     black bars, so the game always renders in a landscape resolution even
+     when the device/window itself is portrait. */
+  #app{
+    position:relative; width:100vw; height:100vh; background:#000;
+    display:flex; align-items:center; justify-content:center;
+  }
+  #gameViewport{
+    position:relative; background:var(--bg); overflow:hidden;
+    width:100%; height:100%;
+    max-width:calc(100vh * 16 / 9);
+    max-height:calc(100vw * 9 / 16);
+    aspect-ratio:16/9;
+    box-shadow:0 0 60px rgba(0,0,0,0.6);
+  }
+  canvas{ display:block; position:absolute; top:0; left:0; width:100%; height:100%; touch-action:none; }
+
+  /* ---------- generic screen overlay ---------- */
+  .screen{
+    position:absolute; inset:0; display:flex; flex-direction:column;
+    align-items:center; justify-content:center; gap:18px;
+    background:radial-gradient(ellipse at 50% 20%, #16211c 0%, #070908 75%);
+    z-index:40;
+  }
+  .hidden{ display:none !important; }
+  .brand{
+    letter-spacing:6px; font-size:13px; color:var(--amber-dim); font-family:'Share Tech Mono',monospace;
+  }
+  .title{
+    font-size:52px; font-weight:700; letter-spacing:4px; color:var(--ink);
+    text-shadow:0 0 24px rgba(201,162,75,0.25);
+  }
+  .title span{ color:var(--amber); }
+  .subtitle{ color:var(--ink-dim); font-size:15px; letter-spacing:2px; max-width:560px; text-align:center; }
+
+  .btn{
+    font-family:'Rajdhani',sans-serif; font-weight:600; letter-spacing:2px; font-size:16px;
+    padding:12px 34px; background:transparent; color:var(--ink);
+    border:1px solid var(--panel-line); cursor:pointer; text-transform:uppercase;
+    transition:all .15s ease; position:relative;
+  }
+  .btn:hover{ border-color:var(--amber); color:var(--amber); background:rgba(201,162,75,0.06); }
+  .btn.primary{ border-color:var(--amber); color:var(--amber); }
+  .btn.primary:hover{ background:var(--amber); color:#0b0f0d; }
+  .btn:focus-visible{ outline:2px solid var(--amber); outline-offset:2px; }
+
+  .panel{
+    background:var(--panel); border:1px solid var(--panel-line);
+    padding:22px 28px; min-width:420px; max-width:640px;
+  }
+  .panel h3{ margin:0 0 10px 0; color:var(--amber); letter-spacing:2px; font-size:14px; text-transform:uppercase; }
+  .panel p{ margin:6px 0; color:var(--ink-dim); font-size:15px; line-height:1.5; }
+  .kbd{
+    display:inline-block; border:1px solid var(--panel-line); border-radius:3px;
+    padding:1px 7px; margin:0 2px; font-family:'Share Tech Mono',monospace; font-size:12px; color:var(--amber);
+    background:#0e1310;
+  }
+  .divider{ width:100%; height:1px; background:var(--panel-line); margin:10px 0; }
+
+  /* mission select */
+  .mission-card{
+    display:flex; justify-content:space-between; align-items:center;
+    border:1px solid var(--panel-line); padding:14px 18px; width:100%;
+    cursor:pointer; transition:.15s;
+  }
+  .mission-card:hover{ border-color:var(--amber); background:rgba(201,162,75,0.05); }
+  .mission-card .mname{ font-weight:700; letter-spacing:1px; }
+  .mission-card .mdesc{ color:var(--ink-dim); font-size:13px; }
+
+  /* loadout */
+  .loadout-grid{ display:flex; gap:14px; margin:14px 0; flex-wrap:wrap; justify-content:center; }
+  .load-item{
+    border:1px solid var(--panel-line); padding:12px 16px; width:150px; text-align:center; cursor:pointer;
+  }
+  .load-item.selected{ border-color:var(--teal); color:var(--teal); }
+  .load-item small{ display:block; color:var(--ink-dim); margin-top:4px; font-size:11px; }
+
+  /* ---------- HUD ---------- */
+  #hud{ position:absolute; inset:0; pointer-events:none; z-index:20; }
+  .hud-topleft{
+    position:absolute; top:16px; left:16px; width:230px; display:flex; flex-direction:column; gap:8px;
+  }
+  .bar-row{ display:flex; align-items:center; gap:8px; }
+  .bar-label{ width:34px; font-size:11px; letter-spacing:1px; color:var(--ink-dim); font-family:'Share Tech Mono',monospace; }
+  .bar-track{ flex:1; height:9px; background:#1a221d; border:1px solid var(--panel-line); position:relative; }
+  .bar-fill{ height:100%; background:var(--teal); transition:width .15s; }
+  .bar-fill.health{ background:#8a3f3a; }
+  .bar-fill.stamina{ background:#7f9e56; }
+
+  .hud-equip{
+    position:absolute; bottom:16px; left:16px; display:flex; gap:10px; align-items:flex-end;
+  }
+  .equip-box{
+    background:rgba(10,14,12,0.82); border:1px solid var(--panel-line); padding:8px 14px; min-width:110px;
+  }
+  .equip-box .lbl{ font-size:10px; color:var(--ink-dim); letter-spacing:1px; }
+  .equip-box .val{ font-family:'Share Tech Mono',monospace; font-size:17px; color:var(--amber); }
+
+  .hud-team{
+    position:absolute; top:16px; right:16px; display:flex; flex-direction:column; gap:6px; align-items:flex-end;
+  }
+  .team-chip{
+    background:rgba(10,14,12,0.82); border:1px solid var(--panel-line); padding:5px 10px;
+    font-size:12px; display:flex; gap:8px; align-items:center; min-width:150px; justify-content:space-between;
+  }
+  .team-chip .dot{ width:8px; height:8px; border-radius:50%; background:var(--blue); }
+  .team-chip.down .dot{ background:var(--red); }
+  .team-chip.down{ color:var(--ink-dim); text-decoration:line-through; }
+
+  .hud-objectives{
+    position:absolute; top:120px; right:16px; width:250px; background:rgba(10,14,12,0.82);
+    border:1px solid var(--panel-line); padding:10px 14px;
+  }
+  .hud-objectives h4{ margin:0 0 8px 0; font-size:11px; color:var(--amber); letter-spacing:2px; }
+  .obj-line{ font-size:12.5px; margin:4px 0; display:flex; gap:6px; align-items:flex-start; line-height:1.35; }
+  .obj-line .mark{ color:var(--ink-dim); width:14px; flex-shrink:0; }
+  .obj-line.done{ color:var(--teal); }
+  .obj-line.done .mark{ color:var(--teal); }
+
+  .hud-commands{
+    position:absolute; bottom:16px; right:16px; background:rgba(10,14,12,0.82);
+    border:1px solid var(--panel-line); padding:8px 14px; font-size:11px; color:var(--ink-dim); width:250px;
+  }
+  .hud-commands .cmd-active{ color:var(--amber); }
+  .cmd-row{ display:flex; justify-content:space-between; margin:2px 0; }
+
+  .interact-prompt{
+    position:absolute; left:50%; top:62%; transform:translate(-50%,0);
+    background:rgba(10,14,12,0.9); border:1px solid var(--amber); padding:6px 16px;
+    font-size:13px; letter-spacing:1px;
+  }
+
+  .center-msg{
+    position:absolute; left:50%; top:18%; transform:translateX(-50%);
+    font-size:22px; letter-spacing:3px; color:var(--amber); text-shadow:0 0 10px rgba(0,0,0,0.8);
+    text-align:center; pointer-events:none;
+  }
+
+  .progress-wrap{
+    position:absolute; left:50%; top:70%; transform:translateX(-50%); width:160px;
+  }
+  .progress-track{ height:6px; background:#1a221d; border:1px solid var(--panel-line); }
+  .progress-fill{ height:100%; background:var(--amber); width:0%; }
+  .progress-txt{ font-size:10px; text-align:center; color:var(--ink-dim); margin-top:3px; letter-spacing:1px; }
+
+  .damage-flash{
+    position:absolute; inset:0; background:rgba(150,20,20,0.0); pointer-events:none; transition:background .08s;
+  }
+
+  /* pause */
+  #pauseMenu .panel{ min-width:340px; }
+
+  /* mission complete */
+  .score-grid{ display:grid; grid-template-columns:1fr auto; gap:6px 24px; width:100%; margin:14px 0; }
+  .score-grid .k{ color:var(--ink-dim); font-size:14px; }
+  .score-grid .v{ font-family:'Share Tech Mono',monospace; color:var(--ink); font-size:14px; text-align:right; }
+  .rank-badge{
+    font-size:78px; font-weight:700; font-family:'Share Tech Mono',monospace;
+    color:var(--amber); text-shadow:0 0 30px rgba(201,162,75,0.4); line-height:1;
+  }
+
+  .scanline{
+    position:absolute; inset:0; pointer-events:none; z-index:60; opacity:0.035;
+    background:repeating-linear-gradient(0deg, #fff 0px, #fff 1px, transparent 1px, transparent 3px);
+    mix-blend-mode:overlay;
+  }
+
+  /* ---------- touch controls (analog stick + action buttons) ---------- */
+  #touchControls{ display:none; }
+  body.touch-enabled #touchControls{ display:block; }
+  body.touch-enabled .hud-equip{ bottom:178px; }
+  body.touch-enabled .hud-commands{ display:none; }
+
+  .joystick-zone{
+    position:absolute; left:14px; bottom:14px; width:150px; height:150px;
+    pointer-events:auto; touch-action:none; z-index:30;
+  }
+  .joystick-base{
+    position:absolute; left:0; top:0; width:150px; height:150px; border-radius:50%;
+    background:rgba(18,24,21,0.55); border:1px solid var(--panel-line);
+  }
+  .joystick-knob{
+    position:absolute; left:50%; top:50%; width:60px; height:60px; margin:-30px;
+    border-radius:50%; background:rgba(201,162,75,0.35); border:1px solid var(--amber);
+    transition:background .1s;
+  }
+  .joystick-knob.active{ background:rgba(201,162,75,0.6); }
+
+  .action-buttons{
+    position:absolute; right:14px; bottom:14px; z-index:30; pointer-events:auto;
+    display:grid; grid-template-columns:56px 56px; grid-template-rows:56px 56px; gap:8px;
+    align-items:end;
+  }
+  .tbtn{
+    font-family:'Rajdhani',sans-serif; font-weight:700; font-size:11px; letter-spacing:0.5px;
+    color:var(--ink); background:rgba(18,24,21,0.62); border:1px solid var(--panel-line);
+    border-radius:50%; width:56px; height:56px; display:flex; align-items:center; justify-content:center;
+    text-align:center; line-height:1.1; pointer-events:auto; touch-action:none; padding:2px;
+  }
+  .tbtn:active, .tbtn.pressed{ background:rgba(201,162,75,0.3); border-color:var(--amber); color:var(--amber); }
+  .tbtn-fire{
+    grid-column:1/3; width:120px; height:64px; border-radius:32px;
+    background:rgba(179,69,58,0.28); border-color:var(--red); font-size:13px; letter-spacing:2px;
+  }
+  .tbtn-fire:active, .tbtn-fire.pressed{ background:rgba(179,69,58,0.55); color:#fff; }
+
+  .team-buttons{
+    position:absolute; right:14px; bottom:216px; z-index:30; pointer-events:auto;
+    display:flex; gap:6px;
+  }
+  .tbtn.small{ width:38px; height:38px; font-size:11px; }
+
+  .move-mode-hint{
+    position:absolute; left:50%; bottom:170px; transform:translateX(-50%); z-index:30;
+    background:rgba(201,162,75,0.85); color:#0b0f0d; font-weight:700; font-size:12px;
+    letter-spacing:1px; padding:5px 12px; border-radius:3px; pointer-events:none;
+  }
+
+  /* ---------- rotate-device overlay ----------
+     The game world is authored for a fixed 16:9 landscape canvas. On a
+     portrait phone, letterboxing that ratio into the viewport leaves a
+     thin horizontal strip in the middle of the screen (the "setengah
+     layar" bug) because most of the vertical space has to become black
+     bars. Rather than cramming the UI into that strip, we hide #app
+     entirely on touch devices in portrait and show a full-screen prompt
+     asking the player to rotate, which uses the whole screen properly. */
+  #rotatePrompt{
+    display:none; position:fixed; inset:0; z-index:9999;
+    background:radial-gradient(ellipse at 50% 40%, #16211c 0%, #070908 75%);
+    color:var(--ink); flex-direction:column; align-items:center; justify-content:center;
+    gap:16px; text-align:center; padding:24px;
+  }
+  #rotatePrompt .icon{ font-size:44px; animation:rotateHint 1.6s ease-in-out infinite; }
+  #rotatePrompt .msg{ font-size:16px; letter-spacing:1px; max-width:320px; color:var(--ink-dim); }
+  #rotatePrompt .brand{ margin-bottom:4px; }
+  @keyframes rotateHint{
+    0%,100%{ transform:rotate(0deg); }
+    50%{ transform:rotate(-90deg); }
+  }
+  body.needs-rotate #app{ display:none; }
+  body.needs-rotate #rotatePrompt{ display:flex; }
+</style>
+</head>
+<body>
+<div id="rotatePrompt">
+  <div class="icon">📱</div>
+  <div class="brand mono">DIVISI OPERASI TAKTIS</div>
+  <div class="msg">Putar perangkat Anda ke mode landscape (mendatar) untuk memainkan OPERASI FAJAR.</div>
+</div>
+<div id="app">
+<div id="gameViewport">
+  <canvas id="gameCanvas"></canvas>
+  <div class="damage-flash" id="damageFlash"></div>
+  <div class="scanline"></div>
+
+  <!-- HUD -->
+  <div id="hud" class="hidden">
+    <div class="hud-topleft">
+      <div class="bar-row"><div class="bar-label">HP</div><div class="bar-track"><div class="bar-fill health" id="hpBar" style="width:100%"></div></div></div>
+      <div class="bar-row"><div class="bar-label">STA</div><div class="bar-track"><div class="bar-fill stamina" id="staBar" style="width:100%"></div></div></div>
+    </div>
+    <div class="hud-equip">
+      <div class="equip-box"><div class="lbl">SENJATA</div><div class="val" id="weaponName">PISTOL</div></div>
+      <div class="equip-box"><div class="lbl">AMUNISI</div><div class="val" id="ammoVal">12 / 36</div></div>
+    </div>
+    <div class="hud-team" id="teamList"></div>
+    <div class="hud-objectives"><h4>OBJEKTIF MISI</h4><div id="objList"></div></div>
+    <div class="hud-commands">
+      <div style="color:var(--amber);letter-spacing:1px;margin-bottom:4px;">PERINTAH TIM</div>
+      <div class="cmd-row"><span><span class="kbd">1</span> Follow</span><span><span class="kbd">2</span> Hold</span></div>
+      <div class="cmd-row"><span><span class="kbd">3</span> Move</span><span><span class="kbd">4</span> Breach</span></div>
+      <div class="cmd-row"><span><span class="kbd">5</span> Regroup</span><span id="cmdModeTxt"></span></div>
+    </div>
+    <div class="interact-prompt hidden" id="interactPrompt"></div>
+    <div class="center-msg hidden" id="centerMsg"></div>
+    <div class="progress-wrap hidden" id="progressWrap">
+      <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+      <div class="progress-txt" id="progressTxt">MEMERIKSA PINTU...</div>
+    </div>
+  </div>
+
+  <!-- MAIN MENU -->
+  <div class="screen" id="mainMenu">
+    <div class="brand">DIVISI OPERASI TAKTIS</div>
+    <div class="title">OPERASI <span>FAJAR</span></div>
+    <div class="subtitle">Prototipe tactical 2D platformer — koordinasi tim, pemeriksaan ruangan, dan penyelesaian objektif.</div>
+    <div style="display:flex; gap:14px; margin-top:10px;">
+      <button class="btn primary" id="btnStart">Mulai Misi</button>
+      <button class="btn" id="btnHelp">Kontrol</button>
+    </div>
+  </div>
+
+  <!-- HELP -->
+  <div class="screen hidden" id="helpScreen">
+    <div class="panel" style="min-width:520px;">
+      <h3>Kontrol</h3>
+      <p><span class="kbd">A</span><span class="kbd">D</span> gerak &nbsp; <span class="kbd">W</span>/<span class="kbd">Space</span> lompat &nbsp; <span class="kbd">S</span> jongkok (tahan)</p>
+      <p><span class="kbd">E</span> interaksi (pintu / amankan warga / ambil barang bukti)</p>
+      <p><span class="kbd">Klik Kiri</span> tembak &nbsp; <span class="kbd">R</span> reload</p>
+      <p><span class="kbd">1</span> Follow &nbsp; <span class="kbd">2</span> Hold &nbsp; <span class="kbd">3</span> Move (klik tujuan) &nbsp; <span class="kbd">4</span> Breach pintu terdekat &nbsp; <span class="kbd">5</span> Regroup</p>
+      <p><span class="kbd">Tab</span> daftar objektif &nbsp; <span class="kbd">Esc</span> jeda</p>
+      <div class="divider"></div>
+      <p>Dekati pintu terkunci dan tahan <span class="kbd">E</span> untuk membukanya perlahan (senyap), atau gunakan perintah Breach untuk mendobrak (cepat, tapi berisik).</p>
+    </div>
+    <button class="btn" id="btnHelpClose">Kembali</button>
+  </div>
+
+  <!-- MISSION SELECT -->
+  <div class="screen hidden" id="missionSelect">
+    <div class="brand">PILIH MISI</div>
+    <div class="panel" style="display:flex; flex-direction:column; gap:10px;">
+      <div class="mission-card" id="mission01">
+        <div><div class="mname">01 — RUMAH SUBURBAN "MELATI"</div><div class="mdesc">Bangunan dua lantai kecil. Laporan penyanderaan &amp; barang bukti tersembunyi.</div></div>
+        <div class="mono" style="color:var(--amber);">GO</div>
+      </div>
+      <div class="mission-card" id="mission02">
+        <div><div class="mname">02 — GUDANG INDUSTRI "BAJA HITAM"</div><div class="mdesc">Fasilitas pergudangan besar, penjagaan jauh lebih berlapis. Jumlah penjaga, warga sipil &amp; lokasi barang bukti berubah setiap penerjunan.</div></div>
+        <div class="mono" style="color:var(--red);">GO</div>
+      </div>
+    </div>
+    <button class="btn" id="btnBackMenu">Kembali</button>
+  </div>
+
+  <!-- BRIEFING -->
+  <div class="screen hidden" id="briefingScreen">
+    <div class="brand">BRIEFING MISI</div>
+    <div class="panel">
+      <h3 id="briefTitle">Rumah Suburban "Melati"</h3>
+      <p id="briefIntro">Sumber melaporkan aktivitas mencurigakan di kediaman ini. Diperkirakan ada warga sipil di dalam, termasuk kemungkinan sandera. Sedikitnya tiga individu bersenjata terdeteksi dalam laporan pengintaian terakhir.</p>
+      <div class="divider"></div>
+      <p><b style="color:var(--ink)">Objektif:</b></p>
+      <p>• Masuki bangunan &nbsp; • Periksa seluruh ruangan &nbsp; • Amankan seluruh warga sipil</p>
+      <p>• Tangani seluruh ancaman &nbsp; • Temukan barang bukti &nbsp; • Capai titik ekstraksi</p>
+      <div class="divider"></div>
+      <p id="briefNote" style="color:var(--ink-dim); font-size:13px;">Dua rekan tim taktis akan mendampingi Anda. Gunakan perintah tim untuk breach ruangan secara terkoordinasi.</p>
+    </div>
+    <div style="display:flex; gap:14px;">
+      <button class="btn" id="btnBackMissions">Kembali</button>
+      <button class="btn primary" id="btnToLoadout">Lanjut ke Perlengkapan</button>
+    </div>
+  </div>
+
+  <!-- LOADOUT -->
+  <div class="screen hidden" id="loadoutScreen">
+    <div class="brand">PILIH PERLENGKAPAN</div>
+    <div class="panel" style="text-align:center;">
+      <h3>Senjata Utama</h3>
+      <div class="loadout-grid" id="weaponGrid"></div>
+      <h3 style="margin-top:18px;">Peralatan</h3>
+      <div class="loadout-grid" id="gearGrid"></div>
+    </div>
+    <button class="btn primary" id="btnDeploy">DEPLOY</button>
+  </div>
+
+  <!-- PAUSE -->
+  <div class="screen hidden" id="pauseMenu">
+    <div class="panel">
+      <h3>Jeda</h3>
+      <p>Misi dijeda.</p>
+    </div>
+    <div style="display:flex; gap:14px;">
+      <button class="btn primary" id="btnResume">Lanjutkan</button>
+      <button class="btn" id="btnQuitMission">Batalkan Misi</button>
+    </div>
+  </div>
+
+  <!-- MISSION COMPLETE -->
+  <div class="screen hidden" id="missionComplete">
+    <div class="brand" id="mcHeader">MISI SELESAI</div>
+    <div class="rank-badge" id="rankBadge">A</div>
+    <div class="panel">
+      <div class="score-grid" id="scoreGrid"></div>
+    </div>
+    <div style="display:flex; gap:14px;">
+      <button class="btn" id="btnReplay">Ulangi Misi</button>
+      <button class="btn primary" id="btnToMenu">Menu Utama</button>
+    </div>
+  </div>
+
+  <!-- TOUCH CONTROLS (analog stick + action buttons, shown on touch devices) -->
+  <div id="touchControls">
+    <div class="joystick-zone" id="joystickZone">
+      <div class="joystick-base">
+        <div class="joystick-knob" id="joystickKnob"></div>
+      </div>
+    </div>
+    <div class="team-buttons">
+      <button class="tbtn small" id="tbFollow">Follow<br>1</button>
+      <button class="tbtn small" id="tbHold">Hold<br>2</button>
+      <button class="tbtn small" id="tbMove">Move<br>3</button>
+      <button class="tbtn small" id="tbBreach">Breach<br>4</button>
+      <button class="tbtn small" id="tbRegroup">RG<br>5</button>
+    </div>
+    <div class="action-buttons">
+      <button class="tbtn" id="tbJump">LOMPAT</button>
+      <button class="tbtn" id="tbCrouch">JONGKOK</button>
+      <button class="tbtn" id="tbInteract">E<br>INTERAKSI</button>
+      <button class="tbtn" id="tbReload">RELOAD</button>
+      <button class="tbtn tbtn-fire" id="tbFire">TEMBAK</button>
+    </div>
+    <div class="move-mode-hint hidden" id="moveModeHint">TAP LOKASI TUJUAN TIM</div>
+  </div>
+
+</div>
+</div>
+
+<script>
+(function(){
+"use strict";
+
+/* =========================================================================
+   OPERASI FAJAR — tactical 2D platformer prototype
+   Single building, ~6 rooms, 2 AI teammates, civilians, hostiles,
+   door/room-clearing system, objective system, sound propagation,
+   mission scoring.
+========================================================================= */
+
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+const viewportEl = document.getElementById('gameViewport');
+
+// ============================================================ SPRITES
+// Sprite sheets: 1 PNG per tipe karakter, grid = baris(animasi) x kolom(frame).
+// File PNG harus berada di folder yang sama dengan HTML ini.
+const SPRITE_FRAME_W = 48, SPRITE_FRAME_H = 64;
+const SPRITE_FEET_OFFSET = 58; // jarak dari atas frame ke titik pijak kaki (baseline y)
+
+const SPRITE_MANIFEST = {
+  player:   { animations:{ idle:{row:0,frames:4}, walk:{row:1,frames:6}, run:{row:2,frames:6}, aim:{row:3,frames:2}, shoot:{row:4,frames:3}, reload:{row:5,frames:4}, hit:{row:6,frames:2}, death:{row:7,frames:5} } },
+  teammate: { animations:{ idle:{row:0,frames:4}, walk:{row:1,frames:6}, run:{row:2,frames:6}, aim:{row:3,frames:2}, shoot:{row:4,frames:3}, reload:{row:5,frames:4}, hit:{row:6,frames:2}, death:{row:7,frames:5} } },
+  hostile:  { animations:{ idle:{row:0,frames:4}, walk:{row:1,frames:6}, run:{row:2,frames:6}, aim:{row:3,frames:2}, shoot:{row:4,frames:3}, reload:{row:5,frames:4}, hit:{row:6,frames:2}, death:{row:7,frames:5} } },
+  civilian: { animations:{ idle:{row:0,frames:4}, walk:{row:1,frames:6}, panic:{row:2,frames:4}, secured:{row:3,frames:3} } },
+};
+// Durasi tiap frame (detik). 'hit' & 'death' berhenti di frame terakhir (tidak loop).
+const SPRITE_FRAME_DURATION = {
+  idle:0.16, walk:0.09, run:0.07, aim:0.22, shoot:0.06, reload:0.4,
+  hit:0.12, death:0.15, panic:0.1, secured:0.22,
+};
+const SPRITE_ONESHOT = { hit:true, death:true };
+
+const SPRITE_SHEETS = {};
+let spritesReady = false;
+function loadSprites(){
+  const names = ['player','teammate','hostile','civilian'];
+  const promises = names.map(name=>{
+    return new Promise(resolve=>{
+      const img = new Image();
+      img.onload = ()=>resolve();
+      img.onerror = ()=>{ console.warn('Gagal memuat sprite:', name); resolve(); };
+      img.src = name+'_spritesheet.png';
+      SPRITE_SHEETS[name] = img;
+    });
+  });
+  return Promise.all(promises).then(()=>{ spritesReady = true; });
+}
+
+// actor: object apa saja yang punya animName/animFrame/animTimer (diinisialisasi di spawn)
+function setActorAnim(actor, desiredAnim, kind){
+  const manifest = SPRITE_MANIFEST[kind];
+  if(!manifest.animations[desiredAnim]) desiredAnim = 'idle';
+  if(actor.animName !== desiredAnim){
+    actor.animName = desiredAnim;
+    actor.animFrame = 0;
+    actor.animTimer = 0;
+  }
+}
+function advanceActorAnim(actor, dt){
+  const dur = SPRITE_FRAME_DURATION[actor.animName] || 0.14;
+  actor.animTimer += dt;
+  while(actor.animTimer >= dur){
+    actor.animTimer -= dur;
+    const kind = actor.spriteKind;
+    const anim = SPRITE_MANIFEST[kind].animations[actor.animName];
+    if(!anim) break;
+    if(SPRITE_ONESHOT[actor.animName]){
+      actor.animFrame = Math.min(actor.animFrame+1, anim.frames-1);
+    } else {
+      actor.animFrame = (actor.animFrame+1) % anim.frames;
+    }
+  }
+}
+// Menggambar 1 karakter dari sprite sheet di posisi layar (sx = feet x layar, feetY = feet y layar)
+function drawSprite(kind, actor, sx, feetY, facing){
+  const img = SPRITE_SHEETS[kind];
+  const manifest = SPRITE_MANIFEST[kind];
+  if(!img || !spritesReady) return false;
+  const anim = manifest.animations[actor.animName] || manifest.animations.idle;
+  const frame = actor.animFrame || 0;
+  const sheetX = frame*SPRITE_FRAME_W, sheetY = anim.row*SPRITE_FRAME_H;
+  ctx.save();
+  ctx.translate(sx, feetY);
+  ctx.scale(facing||1, 1);
+  ctx.drawImage(img, sheetX, sheetY, SPRITE_FRAME_W, SPRITE_FRAME_H,
+                -SPRITE_FRAME_W/2, -SPRITE_FEET_OFFSET, SPRITE_FRAME_W, SPRITE_FRAME_H);
+  ctx.restore();
+  return true;
+}
+
+// Fixed logical/virtual resolution the whole game is authored against
+// (16:9). Actual canvas pixel size can be anything — we scale into it —
+// so the layout (floor height, room widths, etc.) never breaks regardless
+// of the real device/window size.
+const VIRTUAL_W = 1280, VIRTUAL_H = 720;
+let renderScale = 1;
+
+// Touch-capable devices are the ones whose screens are usually portrait
+// by default and can actually be rotated. Detected up-front so resize()
+// can decide whether a portrait window means "phone held upright"
+// (show rotate prompt) vs. "desktop window resized narrow" (just letterbox
+// as before — a mouse user can't rotate their monitor).
+const isTouchDevice = ('ontouchstart' in window || navigator.maxTouchPoints>0);
+
+function resize(){
+  // On touch devices in portrait orientation, forcing the fixed 16:9
+  // landscape aspect ratio into the letterbox would squeeze the whole
+  // game (menus included) into a thin horizontal strip with large black
+  // bars above and below — the UI ends up unusably small ("setengah
+  // layar"/half-screen bug). Instead, hide the game and ask the player
+  // to rotate their device, which is the standard fix for landscape-only
+  // games on phones/tablets.
+  const portrait = window.innerHeight > window.innerWidth;
+  const needsRotate = isTouchDevice && portrait;
+  document.body.classList.toggle('needs-rotate', needsRotate);
+  if(needsRotate) return; // #app is hidden via CSS; no point sizing it
+
+  // size the letterbox container itself with JS (more reliable across
+  // browsers/webviews than relying purely on CSS aspect-ratio + calc()).
+  const parentW = window.innerWidth, parentH = window.innerHeight;
+  let boxW, boxH;
+  if(parentW/parentH > VIRTUAL_W/VIRTUAL_H){ boxH = parentH; boxW = boxH*VIRTUAL_W/VIRTUAL_H; }
+  else { boxW = parentW; boxH = boxW*VIRTUAL_H/VIRTUAL_W; }
+  viewportEl.style.width = Math.round(boxW)+'px';
+  viewportEl.style.height = Math.round(boxH)+'px';
+
+  const dpr = Math.min(window.devicePixelRatio||1, 2);
+  canvas.width = Math.max(1, Math.round(boxW*dpr));
+  canvas.height = Math.max(1, Math.round(boxH*dpr));
+  renderScale = canvas.width / VIRTUAL_W; // uniform since both are 16:9
+}
+window.addEventListener('resize', resize);
+window.addEventListener('orientationchange', ()=>setTimeout(resize,150));
+resize();
+
+// detect touch-capable device -> show on-screen analog stick / buttons
+if(isTouchDevice){
+  document.body.classList.add('touch-enabled');
+}
+// best-effort: try to push the page into fullscreen landscape on a user gesture
+function tryLockLandscape(){
+  const el = document.documentElement;
+  const req = el.requestFullscreen || el.webkitRequestFullscreen;
+  try{
+    const p = req ? req.call(el) : Promise.resolve();
+    Promise.resolve(p).then(()=>{
+      if(screen.orientation && screen.orientation.lock){
+        screen.orientation.lock('landscape').catch(()=>{});
+      }
+    }).catch(()=>{});
+  }catch(e){ /* not supported, letterboxed viewport still keeps landscape shape */ }
+}
+
+const GRAVITY = 1500;
+const GROUND_Y = 560;         // main floor line (feet position)
+const LOFT_Y = 380;           // elevated loft platform floor line
+let WORLD_W = 2000;           // set per-mission by loadMission()
+
+// ---------------------------------------------------------------- helpers
+function clamp(v,a,b){ return Math.max(a, Math.min(b,v)); }
+function rectsOverlap(a,b){ return a.x < b.x+b.w && a.x+a.w > b.x && a.y < b.y+b.h && a.y+a.h > b.y; }
+function dist(ax,ay,bx,by){ return Math.hypot(ax-bx, ay-by); }
+
+// ============================================================ LEVEL DATA
+// Rooms are defined by an x-range on the main floor. "loft" rooms sit on
+// the elevated platform. Walls separate rooms; a wall may hold a Door.
+//
+// Two missions are defined as static templates (MISSIONS, below). Calling
+// loadMission(id) clones the chosen template into these mutable variables,
+// which the rest of the game reads from — so the same rendering/update code
+// works for either mission. Missions that opt into it also get a random
+// guard headcount, civilian headcount, and evidence hiding spot picked at
+// load time (re-rolled every time the mission is (re)started).
+let ROOMS, DOORS, COVER, LADDER, EVIDENCE, EXTRACTION;
+
+function roomAt(x, floor){
+  for(const r of ROOMS){
+    if(r.floor===floor && x>=r.x1 && x<=r.x2) return r;
+  }
+  return null;
+}
+function roomById(id){ return ROOMS.find(r=>r.id===id); }
+function doorNear(x, range){
+  let best=null, bd=1e9;
+  for(const d of DOORS){ const dd=Math.abs(d.x-x); if(dd<range && dd<bd){bd=dd; best=d;} }
+  return best;
+}
+
+function randInt(min,max){ return min + Math.floor(Math.random()*(max-min+1)); }
+function shuffled(arr){
+  const a = arr.slice();
+  for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; }
+  return a;
+}
+
+const MISSIONS = {
+  // ---------------------------------------------------------- MISSION 01
+  m01: {
+    name: 'Rumah Suburban "Melati"',
+    worldW: 2000,
+    rooms: ()=>[
+      { id:'foyer',   name:'Foyer',        x1:10,   x2:280,  clearable:false, floor:'ground', cleared:'unchecked' },
+      { id:'living',  name:'Ruang Tamu',   x1:300,  x2:660,  clearable:true,  floor:'ground', cleared:'unchecked' },
+      { id:'loft',    name:'Loteng',       x1:400,  x2:600,  clearable:true,  floor:'loft',   cleared:'unchecked' },
+      { id:'kitchen', name:'Dapur',        x1:680,  x2:980,  clearable:true,  floor:'ground', cleared:'unchecked' },
+      { id:'corridor',name:'Koridor',      x1:1000, x2:1160, clearable:false, floor:'ground', cleared:'unchecked' },
+      { id:'office',  name:'Kantor',       x1:1180, x2:1460, clearable:true,  floor:'ground', cleared:'unchecked' },
+      { id:'bedroom', name:'Kamar Tidur',  x1:1480, x2:1780, clearable:true,  floor:'ground', cleared:'unchecked' },
+      { id:'closet',  name:'Gudang Rahasia', x1:1800, x2:1980, clearable:true, floor:'ground', cleared:'unchecked', hidden:true },
+    ],
+    doors: ()=>[
+      { id:'d_entrance', x:280,  roomsL:'foyer',  roomsR:'living',  state:'closed', locked:false },
+      { id:'d_kitchen',  x:660,  roomsL:'living', roomsR:'kitchen', state:'closed', locked:false },
+      { id:'d_corridor', x:980,  roomsL:'kitchen',roomsR:'corridor',state:'closed', locked:false },
+      { id:'d_office',   x:1160, roomsL:'corridor',roomsR:'office', state:'closed', locked:true  },
+      { id:'d_bedroom',  x:1460, roomsL:'office', roomsR:'bedroom', state:'closed', locked:false },
+      { id:'d_closet',   x:1780, roomsL:'bedroom',roomsR:'closet',  state:'closed', locked:true, secret:true },
+    ],
+    cover: ()=>[
+      {x:150,y:GROUND_Y,w:50,h:34}, {x:520,y:GROUND_Y,w:60,h:30}, {x:760,y:GROUND_Y,w:44,h:40},
+      {x:1260,y:GROUND_Y,w:70,h:30}, {x:1560,y:GROUND_Y,w:50,h:34},
+    ],
+    ladder: { x1:430, x2:470 },
+    extraction: { x1:10, x2:120 },
+    // single fixed hiding spot — this mission is deterministic, unchanged from the original prototype
+    evidence: ()=>[ { x:1900, y:GROUND_Y, roomId:'closet' } ],
+    hostilePool: ()=>[
+      { x:560,  room:'living', patrolA:340,  patrolB:620,  dir:1,  hp:40, maxHp:40, facing:-1 },
+      { x:1320, room:'office', patrolA:1210, patrolB:1420, dir:1,  hp:40, maxHp:40, facing:-1 },
+      { x:1650, room:'bedroom',patrolA:1520, patrolB:1740, dir:-1, hp:40, maxHp:40, facing:1  },
+    ],
+    hostileCount: [3,3],
+    civilianPool: ()=>[
+      { x:470, floor:'loft',   room:'loft',    name:'Warga #1' },
+      { x:820, floor:'ground', room:'kitchen', name:'Warga #2' },
+    ],
+    civilianCount: [2,2],
+  },
+  // ---------------------------------------------------------- MISSION 02
+  m02: {
+    name: 'Gudang Industri "Baja Hitam"',
+    worldW: 2690,
+    rooms: ()=>[
+      { id:'dock',        name:'Dermaga Bongkar',     x1:10,   x2:270,  clearable:false, floor:'ground', cleared:'unchecked' },
+      { id:'warehouseA',  name:'Gudang A',            x1:290,  x2:650,  clearable:true,  floor:'ground', cleared:'unchecked' },
+      { id:'loft',        name:'Pos Derek',           x1:390,  x2:590,  clearable:true,  floor:'loft',   cleared:'unchecked' },
+      { id:'corridorA',   name:'Koridor Pipa',        x1:670,  x2:830,  clearable:false, floor:'ground', cleared:'unchecked' },
+      { id:'controlRoom', name:'Ruang Kontrol',       x1:850,  x2:1090, clearable:true,  floor:'ground', cleared:'unchecked' },
+      { id:'warehouseB',  name:'Gudang B',            x1:1110, x2:1470, clearable:true,  floor:'ground', cleared:'unchecked' },
+      { id:'corridorB',   name:'Koridor Belakang',    x1:1490, x2:1650, clearable:false, floor:'ground', cleared:'unchecked' },
+      { id:'offices',     name:'Kantor Admin',        x1:1670, x2:1930, clearable:true,  floor:'ground', cleared:'unchecked' },
+      { id:'armory',      name:'Gudang Amunisi',      x1:1950, x2:2190, clearable:true,  floor:'ground', cleared:'unchecked' },
+      { id:'security',    name:'Pos Keamanan',        x1:2210, x2:2450, clearable:true,  floor:'ground', cleared:'unchecked' },
+      { id:'vault',       name:'Brankas Tersembunyi', x1:2470, x2:2670, clearable:true,  floor:'ground', cleared:'unchecked', hidden:true },
+    ],
+    doors: ()=>[
+      { id:'w_dock',     x:270,  roomsL:'dock',       roomsR:'warehouseA',  state:'closed', locked:false },
+      { id:'w_whA',      x:650,  roomsL:'warehouseA',  roomsR:'corridorA',  state:'closed', locked:false },
+      { id:'w_corrA',    x:830,  roomsL:'corridorA',   roomsR:'controlRoom',state:'closed', locked:true  },
+      { id:'w_ctrl',     x:1090, roomsL:'controlRoom', roomsR:'warehouseB', state:'closed', locked:false },
+      { id:'w_whB',      x:1470, roomsL:'warehouseB',  roomsR:'corridorB',  state:'closed', locked:false },
+      { id:'w_corrB',    x:1650, roomsL:'corridorB',   roomsR:'offices',    state:'closed', locked:false },
+      { id:'w_office',   x:1930, roomsL:'offices',     roomsR:'armory',     state:'closed', locked:true  },
+      { id:'w_armory',   x:2190, roomsL:'armory',      roomsR:'security',   state:'closed', locked:false },
+      { id:'w_security', x:2450, roomsL:'security',    roomsR:'vault',      state:'closed', locked:true, secret:true },
+    ],
+    cover: ()=>[
+      {x:160,y:GROUND_Y,w:50,h:34}, {x:560,y:GROUND_Y,w:64,h:30}, {x:940,y:GROUND_Y,w:44,h:40},
+      {x:1300,y:GROUND_Y,w:70,h:30}, {x:1720,y:GROUND_Y,w:50,h:34}, {x:2060,y:GROUND_Y,w:56,h:36},
+      {x:2380,y:GROUND_Y,w:50,h:30},
+    ],
+    ladder: { x1:420, x2:460 },
+    extraction: { x1:10, x2:120 },
+    // several possible hiding spots — one is picked at random each deploy,
+    // so the objective location genuinely differs between playthroughs
+    evidence: ()=>[
+      { x:960,  y:GROUND_Y, roomId:'controlRoom' },
+      { x:2050, y:GROUND_Y, roomId:'armory' },
+      { x:2570, y:GROUND_Y, roomId:'vault' },
+    ],
+    // pool is larger than the max headcount — a random subset is deployed
+    // each mission, so both the count and the exact layout vary every run
+    hostilePool: ()=>[
+      { x:340,  room:'warehouseA',  patrolA:300,  patrolB:470,  dir:1,  hp:45, maxHp:45, facing:-1 },
+      { x:560,  room:'warehouseA',  patrolA:480,  patrolB:640,  dir:-1, hp:50, maxHp:50, facing:1,  fireRate:0.85 },
+      { x:480,  room:'loft', floor:'loft', patrolA:400, patrolB:580, dir:1, hp:45, maxHp:45, facing:-1 },
+      { x:960,  room:'controlRoom', patrolA:860,  patrolB:1080, dir:1,  hp:50, maxHp:50, facing:-1 },
+      { x:1180, room:'warehouseB',  patrolA:1120, patrolB:1300, dir:1,  hp:45, maxHp:45, facing:-1 },
+      { x:1400, room:'warehouseB',  patrolA:1310, patrolB:1460, dir:-1, hp:55, maxHp:55, facing:1,  fireRate:0.9  },
+      { x:1800, room:'offices',     patrolA:1680, patrolB:1920, dir:1,  hp:45, maxHp:45, facing:-1 },
+      { x:2000, room:'armory',      patrolA:1960, patrolB:2100, dir:1,  hp:55, maxHp:55, facing:-1, fireRate:0.9  },
+      { x:2140, room:'armory',      patrolA:2100, patrolB:2180, dir:-1, hp:50, maxHp:50, facing:1  },
+      { x:2260, room:'security',    patrolA:2220, patrolB:2350, dir:1,  hp:50, maxHp:50, facing:-1 },
+      { x:2400, room:'security',    patrolA:2350, patrolB:2440, dir:-1, hp:60, maxHp:60, facing:1,  fireRate:0.85 },
+      { x:2550, room:'vault',       patrolA:2480, patrolB:2660, dir:1,  hp:55, maxHp:55, facing:-1, fireRate:0.9  },
+    ],
+    hostileCount: [6,9],
+    civilianPool: ()=>[
+      { x:400,  floor:'ground', room:'warehouseA',  name:'Pekerja #1' },
+      { x:480,  floor:'loft',   room:'loft',         name:'Pekerja #2' },
+      { x:960,  floor:'ground', room:'controlRoom',  name:'Teknisi #1' },
+      { x:1250, floor:'ground', room:'warehouseB',   name:'Pekerja #3' },
+      { x:1780, floor:'ground', room:'offices',      name:'Staf Admin #1' },
+      { x:2300, floor:'ground', room:'security',     name:'Staf Keamanan #1' },
+    ],
+    civilianCount: [2,4],
+  },
+};
+
+// Clones the chosen mission's template into the mutable level variables
+// above and re-rolls its random evidence spot. Returns the template so
+// callers can also pass it to spawnHostiles()/spawnCivilians().
+function loadMission(id){
+  const m = MISSIONS[id];
+  ROOMS = m.rooms();
+  DOORS = m.doors();
+  COVER = m.cover();
+  LADDER = { x1:m.ladder.x1, x2:m.ladder.x2, yTop:LOFT_Y, yBot:GROUND_Y };
+  EXTRACTION = { x1:m.extraction.x1, x2:m.extraction.x2 };
+  WORLD_W = m.worldW;
+
+  const evPool = m.evidence();
+  const ev = evPool[randInt(0, evPool.length-1)];
+  EVIDENCE = { x:ev.x, y:ev.y, roomId:ev.roomId, collected:false };
+
+  return m;
+}
+
+// ============================================================ ENTITIES
+function makeActorBase(x, floor){
+  return {
+    x, y: floor==='loft'?LOFT_Y:GROUND_Y, vx:0, vy:0, w:22, h:52,
+    facing:1, onGround:true, floor
+  };
+}
+
+const player = Object.assign(makeActorBase(-30,'ground'), {
+  health:100, maxHealth:100, stamina:100, maxStamina:100,
+  crouching:false, weapon:{name:'PISTOL TAKTIS', ammo:12, mag:12, reserve:36, fireCooldown:0, reloading:0},
+  alive:true, interactCharge:0, interactTarget:null,
+  spriteKind:'player', animName:'idle', animFrame:0, animTimer:0, shotT:0, hitT:0,
+});
+
+let teammates = [];
+function spawnTeammates(){
+  teammates = [
+    { id:'T1', label:'ALPHA-2', x:-60, y:GROUND_Y, vx:0, vy:0, w:22, h:52, floor:'ground',
+      state:'FOLLOW', hp:100, alive:true, target:null, moveTarget:null, aimCooldown:0, facing:1,
+      spriteKind:'teammate', animName:'idle', animFrame:0, animTimer:0, shotT:0, hitT:0 },
+    { id:'T2', label:'ALPHA-3', x:-90, y:GROUND_Y, vx:0, vy:0, w:22, h:52, floor:'ground',
+      state:'FOLLOW', hp:100, alive:true, target:null, moveTarget:null, aimCooldown:0, facing:1,
+      spriteKind:'teammate', animName:'idle', animFrame:0, animTimer:0, shotT:0, hitT:0 },
+  ];
+}
+
+// civilians — picks a random subset (sized within the mission's civilianCount
+// range) from its civilianPool, so both headcount and placement vary per run
+let civilians = [];
+function spawnCivilians(m){
+  const pool = shuffled(m.civilianPool());
+  const [min,max] = m.civilianCount;
+  const n = Math.min(pool.length, randInt(min,max));
+  civilians = pool.slice(0,n).map(c=>({
+    x:c.x, y:c.floor==='loft'?LOFT_Y:GROUND_Y, floor:c.floor, room:c.room,
+    state:'idle', secured:false, panicT:0, vx:0, wanderT:0, name:c.name, facing:1,
+    spriteKind:'civilian', animName:'idle', animFrame:0, animTimer:0,
+  }));
+}
+// hostiles — same random-subset approach as civilians, using the mission's
+// hostilePool/hostileCount. Individual pool entries may carry a higher hp or
+// a faster fireRate for extra difficulty; fireRate falls back to the default
+// cooldown in updateHostile() when not set.
+let hostiles = [];
+function spawnHostiles(m){
+  const pool = shuffled(m.hostilePool());
+  const [min,max] = m.hostileCount;
+  const n = Math.min(pool.length, randInt(min,max));
+  hostiles = pool.slice(0,n).map(h=>({
+    x:h.x, y:(h.floor==='loft'?LOFT_Y:GROUND_Y), floor:h.floor||'ground', room:h.room,
+    hp:h.hp, maxHp:h.maxHp, state:'patrol',
+    patrolA:h.patrolA, patrolB:h.patrolB, dir:h.dir,
+    alertT:0, fireCooldown:0, lastKnownX:null, facing:h.facing,
+    fireRate:h.fireRate,
+    spriteKind:'hostile', animName:'idle', animFrame:0, animTimer:0, shotT:0, hitT:0,
+  }));
+}
+
+let bullets = []; // {x,y,vx,from:'player'|'hostile', life}
+let soundEvents = []; // {x, radius, t}
+let particles = []; // muzzle flash / hit fx
+
+// ============================================================ INPUT
+const keys = {};
+let mouse = { x:0, y:0, worldX:0, down:false };
+let commandMode = null; // '3' = move, awaiting click
+// unified touch input state — merged into effective controls each frame
+const touchInput = { moveX:0, up:false, down:false, jump:false, crouch:false, fire:false, interact:false };
+
+function canvasLocalPos(clientX, clientY){
+  const r = canvas.getBoundingClientRect();
+  // convert from CSS pixels (actual on-screen size) into the fixed
+  // VIRTUAL_W x VIRTUAL_H logical space the game is drawn in.
+  const sx = VIRTUAL_W / r.width, sy = VIRTUAL_H / r.height;
+  return { x: (clientX - r.left)*sx, y: (clientY - r.top)*sy };
+}
+
+window.addEventListener('keydown', e=>{
+  if(gameState!=='PLAYING' && e.key!=='Escape') return;
+  keys[e.code]=true;
+  handleHotkey(e.code);
+});
+window.addEventListener('keyup', e=>{ keys[e.code]=false; });
+canvas.addEventListener('mousemove', e=>{ const p=canvasLocalPos(e.clientX,e.clientY); mouse.x=p.x; mouse.y=p.y; });
+canvas.addEventListener('mousedown', e=>{
+  if(gameState!=='PLAYING') return;
+  if(commandMode==='3'){
+    const wx = mouse.x + camera.x;
+    issueMoveCommand(wx);
+    commandMode=null;
+    return;
+  }
+  mouse.down=true;
+});
+canvas.addEventListener('mouseup', ()=>{ mouse.down=false; });
+// tap-to-target for the "Move" team command on touch devices
+canvas.addEventListener('touchstart', e=>{
+  if(gameState!=='PLAYING' || commandMode!=='3') return;
+  const t = e.changedTouches[0];
+  const p = canvasLocalPos(t.clientX, t.clientY);
+  const wx = p.x + camera.x;
+  issueMoveCommand(wx);
+  commandMode=null;
+  e.preventDefault();
+}, {passive:false});
+
+// ---------------------------- virtual analog stick (movement) ----------------------------
+(function setupJoystick(){
+  const zone = document.getElementById('joystickZone');
+  const knob = document.getElementById('joystickKnob');
+  let activeId = null, originX=0, originY=0;
+  const MAX_R = 45;
+
+  function start(id, clientX, clientY){
+    activeId = id; originX=clientX; originY=clientY;
+    knob.classList.add('active');
+  }
+  function move(clientX, clientY){
+    let dx = clientX-originX, dy = clientY-originY;
+    const d = Math.hypot(dx,dy);
+    if(d>MAX_R){ dx = dx/d*MAX_R; dy = dy/d*MAX_R; }
+    knob.style.transform = `translate(${dx}px,${dy}px)`;
+    touchInput.moveX = clamp(dx/MAX_R, -1, 1);
+    touchInput.up = (dy/MAX_R) < -0.55;
+    touchInput.down = (dy/MAX_R) > 0.55;
+  }
+  function end(){
+    activeId=null; touchInput.moveX=0; touchInput.up=false; touchInput.down=false;
+    knob.style.transform='translate(0,0)'; knob.classList.remove('active');
+  }
+  zone.addEventListener('touchstart', e=>{
+    if(activeId!=null) return;
+    const t = e.changedTouches[0];
+    start(t.identifier, t.clientX, t.clientY);
+    e.preventDefault();
+  }, {passive:false});
+  zone.addEventListener('touchmove', e=>{
+    for(const t of e.changedTouches){ if(t.identifier===activeId) move(t.clientX,t.clientY); }
+    e.preventDefault();
+  }, {passive:false});
+  function onEnd(e){
+    for(const t of e.changedTouches){ if(t.identifier===activeId) end(); }
+  }
+  zone.addEventListener('touchend', onEnd);
+  zone.addEventListener('touchcancel', onEnd);
+  // mouse fallback so it's also testable on desktop
+  zone.addEventListener('mousedown', e=>{ start('mouse', e.clientX, e.clientY); });
+  window.addEventListener('mousemove', e=>{ if(activeId==='mouse') move(e.clientX,e.clientY); });
+  window.addEventListener('mouseup', e=>{ if(activeId==='mouse') end(); });
+})();
+
+// ---------------------------- action / team-command buttons ----------------------------
+function bindHold(id, onDown, onUp){
+  const el = document.getElementById(id);
+  if(!el) return;
+  const down = e=>{ e.preventDefault(); el.classList.add('pressed'); onDown&&onDown(); };
+  const up = e=>{ e&&e.preventDefault(); el.classList.remove('pressed'); onUp&&onUp(); };
+  el.addEventListener('touchstart', down, {passive:false});
+  el.addEventListener('touchend', up, {passive:false});
+  el.addEventListener('touchcancel', up, {passive:false});
+  el.addEventListener('mousedown', down);
+  el.addEventListener('mouseup', up);
+  el.addEventListener('mouseleave', up);
+}
+function bindTap(id, onTap){
+  const el = document.getElementById(id);
+  if(!el) return;
+  el.addEventListener('touchstart', e=>{ e.preventDefault(); onTap(); }, {passive:false});
+  el.addEventListener('click', onTap);
+}
+bindHold('tbJump', ()=>{ touchInput.jump=true; }, ()=>{ touchInput.jump=false; });
+bindHold('tbCrouch', ()=>{ touchInput.crouch=true; }, ()=>{ touchInput.crouch=false; });
+bindHold('tbFire', ()=>{ touchInput.fire=true; }, ()=>{ touchInput.fire=false; });
+bindHold('tbInteract', ()=>{ touchInput.interact=true; }, ()=>{ touchInput.interact=false; });
+bindTap('tbReload', ()=>{ if(gameState==='PLAYING') startReload(); });
+bindTap('tbFollow', ()=>{ if(gameState==='PLAYING') teamCommand('FOLLOW'); });
+bindTap('tbHold', ()=>{ if(gameState==='PLAYING') teamCommand('HOLD'); });
+bindTap('tbBreach', ()=>{ if(gameState==='PLAYING') teamCommand('BREACH'); });
+bindTap('tbRegroup', ()=>{ if(gameState==='PLAYING') teamCommand('REGROUP'); });
+bindTap('tbMove', ()=>{
+  if(gameState!=='PLAYING') return;
+  commandMode = commandMode==='3' ? null : '3';
+});
+
+function handleHotkey(code){
+  if(gameState==='PLAYING'){
+    if(code==='Digit1') teamCommand('FOLLOW');
+    if(code==='Digit2') teamCommand('HOLD');
+    if(code==='Digit3'){ commandMode='3'; }
+    if(code==='Digit4') teamCommand('BREACH');
+    if(code==='Digit5') teamCommand('REGROUP');
+    if(code==='KeyR') startReload();
+    if(code==='Escape') togglePause();
+  } else if(gameState==='PAUSED'){
+    if(code==='Escape') togglePause();
+  }
+}
+
+// ============================================================ GAME STATE
+let gameState = 'MENU'; // MENU, HELP, MISSIONSELECT, BRIEFING, LOADOUT, PLAYING, PAUSED, MISSIONCOMPLETE
+let currentMission = 'm01'; // key into MISSIONS, set when a mission card is picked
+let camera = { x:0 };
+let missionTimer = 0;
+let missionStartT = 0;
+let selectedWeapon = 'pistol';
+let selectedGear = 'flashbang';
+let messages = []; // {text, t}
+let objectives = [];
+let shotsFired = 0, shotsHit = 0;
+
+function resetMission(){
+  Object.assign(player, makeActorBase(-30,'ground'));
+  player.health=100; player.stamina=100; player.crouching=false; player.alive=true;
+  player.weapon = { name: selectedWeapon==='pistol' ? 'PISTOL TAKTIS':'SMG RINGAN',
+                     ammo: selectedWeapon==='pistol'?12:25, mag: selectedWeapon==='pistol'?12:25,
+                     reserve: selectedWeapon==='pistol'?36:75, fireCooldown:0, reloading:0 };
+  // rebuilds ROOMS/DOORS/COVER/LADDER/EXTRACTION/EVIDENCE/WORLD_W fresh from
+  // the selected mission's template — also re-rolls the random evidence spot
+  const m = loadMission(currentMission);
+
+  spawnTeammates();
+  spawnCivilians(m);
+  spawnHostiles(m);
+  bullets=[]; soundEvents=[]; particles=[]; messages=[];
+  shotsFired=0; shotsHit=0;
+  missionTimer=0; missionStartT=performance.now();
+  commandMode=null;
+  objectives = [
+    { id:'enter',   text:'Masuki bangunan',                 done:false },
+    { id:'clear',   text:'Periksa seluruh area',             done:false },
+    { id:'civ',     text:'Amankan seluruh warga sipil',      done:false },
+    { id:'threat',  text:'Tangani seluruh ancaman',          done:false },
+    { id:'evidence',text:'Temukan barang bukti',              done:false },
+    { id:'extract', text:'Capai titik ekstraksi',             done:false },
+  ];
+  pushMessage('MISI DIMULAI');
+}
+
+function pushMessage(text){ messages.push({text, t:2.6}); }
+
+// ============================================================ SCREENS / UI WIRING
+const screens = {
+  menu: document.getElementById('mainMenu'),
+  help: document.getElementById('helpScreen'),
+  missionSelect: document.getElementById('missionSelect'),
+  briefing: document.getElementById('briefingScreen'),
+  loadout: document.getElementById('loadoutScreen'),
+  pause: document.getElementById('pauseMenu'),
+  complete: document.getElementById('missionComplete'),
+};
+function showScreen(name){
+  Object.values(screens).forEach(s=>s.classList.add('hidden'));
+  if(name) screens[name].classList.remove('hidden');
+}
+document.getElementById('hud');
+
+document.getElementById('btnStart').onclick = ()=>{ tryLockLandscape(); gameState='MISSIONSELECT'; showScreen('missionSelect'); };
+document.getElementById('btnHelp').onclick = ()=>{ gameState='HELP'; showScreen('help'); };
+document.getElementById('btnHelpClose').onclick = ()=>{ gameState='MENU'; showScreen('menu'); };
+document.getElementById('btnBackMenu').onclick = ()=>{ gameState='MENU'; showScreen('menu'); };
+const BRIEFINGS = {
+  m01: {
+    title: 'Rumah Suburban "Melati"',
+    intro: 'Sumber melaporkan aktivitas mencurigakan di kediaman ini. Diperkirakan ada warga sipil di dalam, termasuk kemungkinan sandera. Sedikitnya tiga individu bersenjata terdeteksi dalam laporan pengintaian terakhir.',
+    note: 'Dua rekan tim taktis akan mendampingi Anda. Gunakan perintah tim untuk breach ruangan secara terkoordinasi.',
+  },
+  m02: {
+    title: 'Gudang Industri "Baja Hitam"',
+    intro: 'Fasilitas pergudangan besar dengan penjagaan jauh lebih berlapis dari operasi sebelumnya. Laporan intelijen tidak bisa memastikan jumlah pasti personel bersenjata di lapangan, maupun lokasi pasti barang bukti — bersiap menghadapi kejutan.',
+    note: 'Dua rekan tim taktis akan mendampingi Anda. Jumlah penjaga, jumlah warga sipil, dan lokasi barang bukti akan berbeda setiap kali misi ini diterjunkan.',
+  },
+};
+function updateBriefingScreen(){
+  const b = BRIEFINGS[currentMission];
+  document.getElementById('briefTitle').textContent = b.title;
+  document.getElementById('briefIntro').textContent = b.intro;
+  document.getElementById('briefNote').textContent = b.note;
+}
+document.getElementById('mission01').onclick = ()=>{ currentMission='m01'; gameState='BRIEFING'; showScreen('briefing'); updateBriefingScreen(); };
+document.getElementById('mission02').onclick = ()=>{ currentMission='m02'; gameState='BRIEFING'; showScreen('briefing'); updateBriefingScreen(); };
+document.getElementById('btnBackMissions').onclick = ()=>{ gameState='MISSIONSELECT'; showScreen('missionSelect'); };
+document.getElementById('btnToLoadout').onclick = ()=>{ gameState='LOADOUT'; showScreen('loadout'); buildLoadoutUI(); };
+document.getElementById('btnDeploy').onclick = ()=>{ tryLockLandscape(); startMission(); };
+document.getElementById('btnResume').onclick = ()=>{ togglePause(); };
+document.getElementById('btnQuitMission').onclick = ()=>{ gameState='MENU'; showScreen('menu'); document.getElementById('hud').classList.add('hidden'); };
+document.getElementById('btnReplay').onclick = ()=>{ startMission(); };
+document.getElementById('btnToMenu').onclick = ()=>{ gameState='MENU'; showScreen('menu'); document.getElementById('hud').classList.add('hidden'); };
+
+function buildLoadoutUI(){
+  const wg = document.getElementById('weaponGrid');
+  wg.innerHTML='';
+  [['pistol','PISTOL TAKTIS','12+36 peluru, presisi tinggi'],['smg','SMG RINGAN','25+75 peluru, laju tembak cepat']].forEach(([id,label,desc])=>{
+    const d=document.createElement('div');
+    d.className='load-item'+(selectedWeapon===id?' selected':'');
+    d.innerHTML = label+'<small>'+desc+'</small>';
+    d.onclick=()=>{ selectedWeapon=id; buildLoadoutUI(); };
+    wg.appendChild(d);
+  });
+  const gg = document.getElementById('gearGrid');
+  gg.innerHTML='';
+  [['flashbang','FLASHBANG','Kejutkan musuh sebelum breach'],['medkit','MEDKIT','Pulihkan HP di lapangan']].forEach(([id,label,desc])=>{
+    const d=document.createElement('div');
+    d.className='load-item'+(selectedGear===id?' selected':'');
+    d.innerHTML = label+'<small>'+desc+'</small>';
+    d.onclick=()=>{ selectedGear=id; buildLoadoutUI(); };
+    gg.appendChild(d);
+  });
+}
+
+function startMission(){
+  resetMission();
+  gameState='PLAYING';
+  showScreen(null);
+  document.getElementById('hud').classList.remove('hidden');
+}
+function togglePause(){
+  if(gameState==='PLAYING'){ gameState='PAUSED'; showScreen('pause'); }
+  else if(gameState==='PAUSED'){ gameState='PLAYING'; showScreen(null); }
+}
+
+// ============================================================ TEAM COMMANDS
+function nearestDoorAhead(){
+  const searchX = player.x + player.facing*40;
+  return doorNear(searchX, 260) || doorNear(player.x, 260);
+}
+function issueMoveCommand(wx){
+  teammates.forEach(t=>{ if(!t.alive) return; t.state='MOVE'; t.moveTarget=wx; });
+  pushMessage('TIM: BERGERAK KE TITIK');
+}
+function teamCommand(cmd){
+  if(cmd==='FOLLOW'){ teammates.forEach(t=>{ if(t.alive){ t.state='FOLLOW'; t.moveTarget=null; }}); pushMessage('TIM: FOLLOW'); }
+  else if(cmd==='HOLD'){ teammates.forEach(t=>{ if(t.alive){ t.state='HOLD'; }}); pushMessage('TIM: HOLD POSITION'); }
+  else if(cmd==='REGROUP'){ teammates.forEach(t=>{ if(t.alive){ t.state='FOLLOW'; t.moveTarget=null; }}); pushMessage('TIM: REGROUP'); }
+  else if(cmd==='BREACH'){
+    const d = nearestDoorAhead();
+    if(!d){ pushMessage('TIDAK ADA PINTU TERDEKAT'); return; }
+    d.state='open'; d.locked=false;
+    emitSound(d.x, 480); // breach is loud
+    teammates.forEach(t=>{ if(t.alive){ t.state='BREACH'; t.target=d; }});
+    pushMessage('TIM: BREACHING '+d.id.toUpperCase());
+  }
+}
+
+// ============================================================ SOUND SYSTEM
+function emitSound(x, radius){ soundEvents.push({x, radius, t:0.9}); }
+
+// ============================================================ PHYSICS / MOVEMENT
+function applyPhysics(a, dt, floorY){
+  a.vy += GRAVITY*dt;
+  a.x += a.vx*dt;
+  a.y += a.vy*dt;
+  if(a.y >= floorY){ a.y=floorY; a.vy=0; a.onGround=true; } else { a.onGround=false; }
+}
+// wall/door collision on ground floor: blocks x movement unless door open
+function resolveDoorCollisions(a, prevX){
+  if(a.floor!=='ground') return;
+  for(const d of DOORS){
+    const solid = d.state!=='open';
+    if(!solid) continue;
+    const crossing = (prevX - d.x) * (a.x - d.x) <= 0 && Math.abs(a.x-d.x) < a.w;
+    if(crossing){
+      a.x = prevX; a.vx=0;
+    }
+  }
+}
+
+// ============================================================ UPDATE: PLAYER
+function updatePlayer(dt){
+  if(!player.alive){ setActorAnim(player,'death','player'); advanceActorAnim(player, dt); return; }
+  // merge keyboard + on-screen analog stick / buttons into one effective input
+  const crouchHeld = !!keys['KeyS'] || touchInput.crouch;
+  const jumpHeld = !!keys['KeyW'] || !!keys['Space'] || touchInput.jump;
+  const fireHeld = mouse.down || touchInput.fire;
+  const interactHeld = !!keys['KeyE'] || touchInput.interact;
+  const upHeld = !!keys['ArrowUp'] || touchInput.up;
+  const downHeld = !!keys['ArrowDown'] || touchInput.down;
+
+  const speed = crouchHeld ? 90 : 175;
+  let moveX = touchInput.moveX;
+  if(keys['KeyA']||keys['ArrowLeft']) moveX -= 1;
+  if(keys['KeyD']||keys['ArrowRight']) moveX += 1;
+  moveX = clamp(moveX, -1, 1);
+  player.crouching = crouchHeld;
+  if(Math.abs(moveX)>0.1) player.facing = moveX>0?1:-1;
+
+  player.vx = moveX*speed;
+
+  if(jumpHeld && player.onGround){
+    player.vy = -520; player.onGround=false;
+    emitSound(player.x, 90);
+  }
+
+  // ladder handling
+  const onLadderX = player.x>LADDER.x1-10 && player.x<LADDER.x2+10;
+  if(onLadderX && (keys['KeyW']||upHeld) && player.floor==='ground' && player.x>LADDER.x1-40 && player.x<LADDER.x2+40){
+    player.floor='loft'; player.y=GROUND_Y-2;
+  }
+  if(onLadderX && downHeld && player.floor==='loft'){
+    player.floor='ground'; player.y=LOFT_Y+2;
+  }
+
+  const floorY = player.floor==='loft'?LOFT_Y:GROUND_Y;
+  const prevX = player.x;
+  applyPhysics(player, dt, floorY);
+  player.x = clamp(player.x, -60, WORLD_W);
+  resolveDoorCollisions(player, prevX);
+
+  // stamina drain/regen
+  if(Math.abs(moveX)>0.1 && !player.crouching){ player.stamina = clamp(player.stamina-10*dt,0,100); }
+  else { player.stamina = clamp(player.stamina+14*dt,0,100); }
+
+  // footstep sound (throttled by movement)
+  if(Math.abs(moveX)>0.1 && player.onGround && !player.crouching && Math.random()<dt*3.2){
+    emitSound(player.x, 130);
+  }
+
+  // weapon cooldown / reload
+  const w = player.weapon;
+  if(w.fireCooldown>0) w.fireCooldown -= dt;
+  if(w.reloading>0){
+    w.reloading -= dt;
+    if(w.reloading<=0){
+      const need = w.mag - w.ammo;
+      const take = Math.min(need, w.reserve);
+      w.ammo += take; w.reserve -= take;
+      pushMessage('RELOAD SELESAI');
+    }
+  }
+  if(fireHeld && w.fireCooldown<=0 && w.reloading<=0 && w.ammo>0){
+    fireWeapon(player.x, player.y-30, player.facing, 'player');
+    w.ammo--; w.fireCooldown = selectedWeapon==='pistol'?0.34:0.13;
+    shotsFired++;
+    emitSound(player.x, 620);
+    player.shotT = 0.14;
+  }
+
+  // interact
+  updateInteract(dt, interactHeld);
+
+  // --- animasi sprite ---
+  if(player.shotT>0) player.shotT -= dt;
+  if(player.hitT>0) player.hitT -= dt;
+  let pAnim;
+  if(!player.alive) pAnim='death';
+  else if(player.hitT>0) pAnim='hit';
+  else if(player.shotT>0) pAnim='shoot';
+  else if(fireHeld || w.reloading>0) pAnim = w.reloading>0 ? 'reload' : 'aim';
+  else if(Math.abs(player.vx)>110) pAnim='run';
+  else if(Math.abs(player.vx)>5) pAnim='walk';
+  else pAnim='idle';
+  setActorAnim(player, pAnim, 'player');
+  advanceActorAnim(player, dt);
+}
+
+function startReload(){
+  const w=player.weapon;
+  if(w.reloading>0 || w.ammo===w.mag || w.reserve<=0) return;
+  w.reloading = 1.6;
+  pushMessage('RELOADING...');
+}
+
+function fireWeapon(x,y,dir,from){
+  bullets.push({x, y, vx: dir*950, from, life:0.9});
+  particles.push({x, y, t:0.08, kind:'muzzle'});
+}
+
+// ---- interaction (doors, civilians, evidence) ----
+function updateInteract(dt, pressingIn){
+  let prompt=''; let target=null; let kind=null;
+  const nd = doorNear(player.x, 46);
+  if(nd){
+    target=nd; kind='door';
+    if(nd.state==='open') prompt = 'E — Tutup Pintu';
+    else if(nd.locked) prompt = 'Tahan E — Buka Perlahan (senyap)';
+    else prompt = 'E — Buka Pintu';
+  } else {
+    const civ = civilians.find(c=>!c.secured && c.floor===player.floor && Math.abs(c.x-player.x)<50);
+    if(civ){ target=civ; kind='civilian'; prompt='E — Amankan Warga'; }
+    else if(!EVIDENCE.collected && Math.abs(EVIDENCE.x-player.x)<55 && player.floor==='ground'){
+      target=EVIDENCE; kind='evidence'; prompt='E — Ambil Barang Bukti';
+    }
+  }
+
+  const promptEl = document.getElementById('interactPrompt');
+  const progWrap = document.getElementById('progressWrap');
+  if(prompt){ promptEl.textContent=prompt; promptEl.classList.remove('hidden'); }
+  else { promptEl.classList.add('hidden'); }
+
+  const pressing = !!pressingIn;
+  if(kind==='door' && target.locked && pressing){
+    player.interactCharge += dt;
+    progWrap.classList.remove('hidden');
+    document.getElementById('progressFill').style.width = clamp(player.interactCharge/2.6*100,0,100)+'%';
+    document.getElementById('progressTxt').textContent='MEMBUKA PERLAHAN...';
+    if(player.interactCharge>=2.6){
+      target.state='open'; target.locked=false;
+      player.interactCharge=0;
+      pushMessage('PINTU DIBUKA SENYAP');
+      progWrap.classList.add('hidden');
+    }
+  } else {
+    if(player.interactCharge>0 && !(kind==='door'&&target&&target.locked)) player.interactCharge=0;
+    progWrap.classList.add('hidden');
+  }
+
+  if(pressing && !player.__ePrev){
+    if(kind==='door' && !target.locked){
+      if(target.state==='open'){ target.state='closed'; emitSound(target.x,70); pushMessage('PINTU DITUTUP'); }
+      else { target.state='open'; emitSound(target.x,120); pushMessage('PINTU DIBUKA'); }
+    } else if(kind==='civilian'){
+      target.secured=true; target.state='secured';
+      pushMessage('WARGA DIAMANKAN: '+target.name);
+    } else if(kind==='evidence'){
+      target.collected=true;
+      pushMessage('BARANG BUKTI DITEMUKAN');
+    }
+  }
+  player.__ePrev = pressing;
+}
+
+// ============================================================ UPDATE: TEAMMATES
+function teammateRoom(t){ return roomAt(t.x, t.floor); }
+function updateTeammate(t, dt){
+  if(!t.alive){ setActorAnim(t,'death','teammate'); advanceActorAnim(t, dt); return; }
+  const speed=150;
+  let desiredX=t.x;
+
+  if(t.state==='FOLLOW'){
+    const followX = player.x - (t.id==='T1'? 45 : 75)*player.facing;
+    desiredX = followX;
+    t.floor = player.floor;
+  } else if(t.state==='HOLD'){
+    desiredX = t.x;
+  } else if(t.state==='MOVE'){
+    desiredX = t.moveTarget;
+    if(Math.abs(t.x-t.moveTarget)<8) t.state='HOLD';
+  } else if(t.state==='BREACH'){
+    if(t.target){
+      desiredX = t.target.x + (t.id==='T1'? 30:55);
+      if(Math.abs(t.x-t.target.x)<40){ t.state='CLEARING'; t.clearT=1.0; }
+    }
+  } else if(t.state==='CLEARING'){
+    t.clearT -= dt;
+    desiredX = t.x + Math.sin(performance.now()/220)*0.4; // small scan sway
+    if(t.clearT<=0) t.state='FOLLOW';
+  }
+
+  const dx = desiredX - t.x;
+  t.vx = clamp(dx*3, -speed, speed);
+  if(Math.abs(dx)<4) t.vx=0;
+  if(Math.abs(t.vx)>4) t.facing = t.vx>0?1:-1;
+
+  t.vy += GRAVITY*dt;
+  t.x += t.vx*dt; t.y += t.vy*dt;
+  const floorY = t.floor==='loft'?LOFT_Y:GROUND_Y;
+  if(t.y>=floorY){ t.y=floorY; t.vy=0; }
+  t.x = clamp(t.x,-90,WORLD_W);
+
+  // auto-open doors teammates are near (they use door handles like pros)
+  const d = doorNear(t.x, 30);
+  if(d && d.state!=='open' && !d.locked) d.state='open';
+
+  // combat assist: engage hostiles that are ALERT and in the same room
+  if(t.aimCooldown>0) t.aimCooldown -= dt;
+  const r = teammateRoom(t);
+  if(r){
+    const threat = hostiles.find(h=>h.alive!==false && h.hp>0 && h.floor===t.floor && roomAt(h.x,h.floor)===r && h.state!=='patrol');
+    if(threat && t.aimCooldown<=0){
+      threat.hp -= 9;
+      t.aimCooldown = 0.5;
+      particles.push({x:t.x + t.facing*14, y:t.y-30, t:0.08, kind:'muzzle'});
+      t.shotT = 0.14;
+      if(threat.hp<=0){ pushMessage('ANCAMAN DINETRALISIR OLEH '+t.label); }
+    }
+  }
+
+  // --- animasi sprite ---
+  if(t.shotT>0) t.shotT -= dt;
+  if(t.hitT>0) t.hitT -= dt;
+  let tAnim;
+  if(!t.alive) tAnim='death';
+  else if(t.hitT>0) tAnim='hit';
+  else if(t.shotT>0) tAnim='shoot';
+  else if(Math.abs(t.vx)>90) tAnim='run';
+  else if(Math.abs(t.vx)>4) tAnim='walk';
+  else tAnim='idle';
+  setActorAnim(t, tAnim, 'teammate');
+  advanceActorAnim(t, dt);
+}
+
+// ============================================================ UPDATE: CIVILIANS
+function updateCivilian(c, dt){
+  if(c.secured){ c.vx=0; setActorAnim(c,'secured','civilian'); advanceActorAnim(c, dt); return; }
+  // react to nearby sound / hostile alert
+  const nearGunshot = soundEvents.some(s=> s.t>0 && dist(s.x,0,c.x,0) < s.radius);
+  const nearAlertHostile = hostiles.some(h=> h.hp>0 && h.state==='alert' && h.floor===c.floor && dist(h.x,0,c.x,0)<260);
+  if(nearGunshot || nearAlertHostile){ c.state='panic'; c.panicT=3.5; }
+
+  if(c.state==='panic'){
+    c.panicT -= dt;
+    const room = roomById(c.room);
+    const fleeDir = c.x < (room.x1+room.x2)/2 ? -1 : 1;
+    c.vx = fleeDir*95;
+    if(c.panicT<=0) c.state='idle';
+  } else {
+    c.wanderT -= dt;
+    if(c.wanderT<=0){ c.vx = (Math.random()<0.5?-1:1)*30; c.wanderT = 1.5+Math.random()*2; }
+  }
+  const room = roomById(c.room);
+  const minX = room.x1+20, maxX = room.x2-20;
+  c.x = clamp(c.x + c.vx*dt, minX, maxX);
+  if(Math.abs(c.vx)>1) c.facing = c.vx>0?1:-1;
+
+  // --- animasi sprite ---
+  const cAnim = c.state==='panic' ? 'panic' : (Math.abs(c.vx)>3 ? 'walk' : 'idle');
+  setActorAnim(c, cAnim, 'civilian');
+  advanceActorAnim(c, dt);
+}
+
+// ============================================================ UPDATE: HOSTILES
+function hasLineOfSight(h){
+  if(h.floor!==player.floor) return false;
+  const hRoom = roomAt(h.x, h.floor), pRoom = roomAt(player.x, player.floor);
+  if(!hRoom || !pRoom) return false;
+  if(hRoom.id!==pRoom.id){
+    // check if any closed door between them blocks sight
+    const lo = Math.min(h.x,player.x), hi=Math.max(h.x,player.x);
+    for(const d of DOORS){ if(d.x>lo && d.x<hi && d.state!=='open') return false; }
+  }
+  return dist(h.x,0,player.x,0) < 430;
+}
+function updateHostile(h, dt){
+  if(h.hp<=0){ setActorAnim(h,'death','hostile'); advanceActorAnim(h, dt); return; }
+  if(h.fireCooldown>0) h.fireCooldown -= dt;
+  if(h.shotT>0) h.shotT -= dt;
+  if(h.hitT>0) h.hitT -= dt;
+
+  const seesPlayer = player.alive && hasLineOfSight(h) && !player.crouching || (player.alive && hasLineOfSight(h) && dist(h.x,0,player.x,0)<160);
+  if(seesPlayer){
+    h.state='alert'; h.alertT=3.5; h.lastKnownX=player.x;
+    emitSound(h.x, 40); // low ambient alert cue (not amplified)
+  } else if(h.state==='alert'){
+    h.alertT -= dt;
+    if(h.alertT<=0) h.state='suspicious', h.alertT=4;
+  } else if(h.state==='suspicious'){
+    h.alertT -= dt;
+    if(h.alertT<=0) h.state='patrol';
+  }
+
+  // react to sound
+  if(h.state==='patrol'){
+    for(const s of soundEvents){
+      if(s.t>0 && dist(s.x,0,h.x,0) < s.radius){
+        h.state='suspicious'; h.alertT=4; h.lastKnownX=s.x;
+      }
+    }
+  }
+
+  if(h.state==='patrol'){
+    const speed=45;
+    h.x += h.dir*speed*dt;
+    if(h.x<h.patrolA){ h.x=h.patrolA; h.dir=1; }
+    if(h.x>h.patrolB){ h.x=h.patrolB; h.dir=-1; }
+    h.facing = h.dir;
+  } else if(h.state==='suspicious'){
+    const tx = h.lastKnownX!=null?h.lastKnownX:h.x;
+    const dir = tx>h.x?1:-1;
+    h.x += dir*60*dt;
+    h.facing=dir;
+  } else if(h.state==='alert'){
+    h.facing = player.x>h.x?1:-1;
+    const distToPlayer = Math.abs(player.x-h.x);
+    if(distToPlayer>240) h.x += h.facing*70*dt; // close distance a bit
+    if(distToPlayer<380 && h.fireCooldown<=0 && hasLineOfSight(h)){
+      fireWeapon(h.x, h.y-30, h.facing, 'hostile');
+      h.fireCooldown = h.fireRate || 1.1;
+      emitSound(h.x, 560);
+      h.shotT = 0.14;
+    }
+  }
+  const room = roomById(h.room);
+  h.x = clamp(h.x, room.x1+10, room.x2-10);
+
+  // --- animasi sprite ---
+  let hAnim;
+  if(h.hitT>0) hAnim='hit';
+  else if(h.shotT>0) hAnim='shoot';
+  else if(h.state==='alert') hAnim='aim';
+  else if(h.state==='patrol' || h.state==='suspicious') hAnim = 'walk';
+  else hAnim='idle';
+  setActorAnim(h, hAnim, 'hostile');
+  advanceActorAnim(h, dt);
+}
+
+// ============================================================ BULLETS / DAMAGE
+function updateBullets(dt){
+  for(const b of bullets){
+    b.x += b.vx*dt; b.life -= dt;
+  }
+  bullets = bullets.filter(b=>b.life>0);
+
+  for(const b of bullets){
+    if(b.life<=0) continue;
+    if(b.from==='player'){
+      for(const h of hostiles){
+        if(h.hp<=0 || h.floor!==player.floor) continue;
+        if(Math.abs(h.x-b.x)<16 && Math.abs((h.y-30)-b.y)<40){
+          h.hp -= 22; b.life=0; shotsHit++;
+          particles.push({x:h.x,y:h.y-30,t:0.15,kind:'hit'});
+          h.hitT = 0.22;
+          if(h.hp<=0) pushMessage('ANCAMAN DINETRALISIR');
+          h.state='alert'; h.alertT=3.5; h.lastKnownX=player.x;
+        }
+      }
+    } else if(b.from==='hostile'){
+      if(player.floor===playerFloorOfBullet(b) && Math.abs(player.x-b.x)<16 && Math.abs((player.y-30)-b.y)<40){
+        player.health -= 9; b.life=0;
+        flashDamage();
+        player.hitT = 0.22;
+        if(player.health<=0){ player.health=0; player.alive=false; pushMessage('OPERATOR TUMBANG'); }
+      }
+      teammates.forEach(t=>{
+        if(t.alive && Math.abs(t.x-b.x)<16 && Math.abs((t.y-30)-b.y)<40){
+          t.hp -= 9; b.life=0;
+          t.hitT = 0.22;
+          if(t.hp<=0){ t.alive=false; pushMessage(t.label+' GUGUR'); }
+        }
+      });
+    }
+  }
+  bullets = bullets.filter(b=>b.life>0);
+}
+function playerFloorOfBullet(){ return player.floor; }
+function flashDamage(){
+  const el = document.getElementById('damageFlash');
+  el.style.background='rgba(150,20,20,0.35)';
+  setTimeout(()=>{ el.style.background='rgba(150,20,20,0.0)'; },120);
+}
+
+// ============================================================ ROOM CLEARING
+function updateRoomClearing(){
+  for(const r of ROOMS){
+    if(!r.clearable) continue;
+    const playerHere = roomAt(player.x, player.floor)===r;
+    const teammateHere = teammates.some(t=>t.alive && roomAt(t.x,t.floor)===r);
+    if(r.cleared==='unchecked' && (playerHere||teammateHere)) r.cleared='checking';
+    if(r.cleared==='checking'){
+      const liveThreat = hostiles.some(h=>h.hp>0 && h.room===r.id);
+      if((playerHere||teammateHere) && !liveThreat) r.cleared='clear';
+    }
+  }
+}
+
+// ============================================================ OBJECTIVES
+function updateObjectives(){
+  const get = id=>objectives.find(o=>o.id===id);
+  if(player.x>20) get('enter').done = true;
+  get('clear').done = ROOMS.filter(r=>r.clearable).every(r=>r.cleared==='clear');
+  get('civ').done = civilians.every(c=>c.secured);
+  get('threat').done = hostiles.every(h=>h.hp<=0);
+  get('evidence').done = EVIDENCE.collected;
+  const allBefore = objectives.filter(o=>o.id!=='extract').every(o=>o.done);
+  if(allBefore && player.x < EXTRACTION.x2 && player.x>EXTRACTION.x1 && !get('extract').done){
+    get('extract').done = true;
+    completeMission();
+  }
+}
+
+// ============================================================ MISSION COMPLETE / SCORING
+function computeRank(score){
+  if(score>=90) return 'S';
+  if(score>=75) return 'A';
+  if(score>=55) return 'B';
+  if(score>=35) return 'C';
+  return 'D';
+}
+function completeMission(){
+  if(gameState!=='PLAYING') return;
+  gameState='MISSIONCOMPLETE';
+  const timeSec = missionTimer;
+  const objDone = objectives.filter(o=>o.done).length;
+  const civSecured = civilians.filter(c=>c.secured).length;
+  const teamAlive = teammates.filter(t=>t.alive).length;
+  const accuracy = shotsFired>0 ? shotsHit/shotsFired : 1;
+  const timeScore = clamp(100 - Math.max(0,timeSec-180)/3, 0, 100);
+
+  const objScore = (objDone/objectives.length)*100;
+  const civScore = civilians.length? (civSecured/civilians.length)*100 : 100;
+  const teamScore = (teamAlive/teammates.length)*100;
+  const evScore = EVIDENCE.collected?100:0;
+  const tacticalScore = clamp(accuracy*70 + (teamAlive===teammates.length?30:10), 0, 100);
+
+  const total = objScore*0.30 + civScore*0.20 + teamScore*0.20 + evScore*0.10 + tacticalScore*0.10 + timeScore*0.10;
+  const rank = computeRank(total);
+
+  document.getElementById('mcHeader').textContent = objDone===objectives.length ? 'MISI SELESAI' : 'MISI BERAKHIR';
+  document.getElementById('rankBadge').textContent = rank;
+  const mins = Math.floor(timeSec/60), secs = Math.floor(timeSec%60);
+  const rows = [
+    ['Objektif selesai', objDone+' / '+objectives.length],
+    ['Warga sipil diamankan', civSecured+' / '+civilians.length],
+    ['Anggota tim selamat', teamAlive+' / '+teammates.length],
+    ['Barang bukti', EVIDENCE.collected?'Ditemukan':'Tidak ditemukan'],
+    ['Akurasi tembakan', Math.round(accuracy*100)+'%'],
+    ['Waktu tempuh', mins+'m '+secs+'s'],
+    ['Skor total', Math.round(total)+' / 100'],
+  ];
+  document.getElementById('scoreGrid').innerHTML = rows.map(([k,v])=>
+    '<div class="k">'+k+'</div><div class="v">'+v+'</div>').join('');
+  showScreen('complete');
+}
+
+// player death -> auto end mission after delay
+let deathHandled=false;
+function checkPlayerDeath(dt){
+  if(!player.alive && !deathHandled){
+    deathHandled=true;
+    setTimeout(()=>{ if(gameState==='PLAYING') completeMission(); }, 1400);
+  }
+}
+
+// ============================================================ MAIN UPDATE
+let last = performance.now();
+function update(dt){
+  if(gameState!=='PLAYING') return;
+  missionTimer += dt;
+
+  for(const s of soundEvents) s.t -= dt;
+  soundEvents = soundEvents.filter(s=>s.t>0);
+  for(const p of particles) p.t -= dt;
+  particles = particles.filter(p=>p.t>0);
+  for(const m of messages) m.t -= dt;
+  messages = messages.filter(m=>m.t>0);
+
+  updatePlayer(dt);
+  teammates.forEach(t=>updateTeammate(t,dt));
+  civilians.forEach(c=>updateCivilian(c,dt));
+  hostiles.forEach(h=>updateHostile(h,dt));
+  updateBullets(dt);
+  updateRoomClearing();
+  updateObjectives();
+  checkPlayerDeath(dt);
+
+  // camera follow
+  const targetCamX = player.x - VIRTUAL_W/2;
+  camera.x += (targetCamX-camera.x)*Math.min(1, dt*6);
+  camera.x = clamp(camera.x, -140, WORLD_W-VIRTUAL_W+140);
+
+  updateHUD();
+}
+
+// ============================================================ HUD UPDATE
+function updateHUD(){
+  document.getElementById('hpBar').style.width = clamp(player.health,0,100)+'%';
+  document.getElementById('staBar').style.width = clamp(player.stamina,0,100)+'%';
+  document.getElementById('weaponName').textContent = player.weapon.name;
+  document.getElementById('ammoVal').textContent = (player.weapon.reloading>0? 'RELOAD…' : player.weapon.ammo+' / '+player.weapon.reserve);
+
+  const teamList = document.getElementById('teamList');
+  teamList.innerHTML = teammates.map(t=>
+    '<div class="team-chip'+(t.alive?'':' down')+'"><span>'+t.label+' — '+stateLabel(t.state)+'</span><span class="dot"></span></div>'
+  ).join('');
+
+  const objList = document.getElementById('objList');
+  objList.innerHTML = objectives.map(o=>
+    '<div class="obj-line'+(o.done?' done':'')+'"><span class="mark">'+(o.done?'✓':'▸')+'</span><span>'+o.text+'</span></div>'
+  ).join('');
+
+  document.getElementById('cmdModeTxt').textContent = commandMode==='3' ? 'KLIK TUJUAN' : '';
+  const hint = document.getElementById('moveModeHint');
+  if(hint) hint.classList.toggle('hidden', commandMode!=='3');
+  const tbMoveBtn = document.getElementById('tbMove');
+  if(tbMoveBtn) tbMoveBtn.classList.toggle('pressed', commandMode==='3');
+
+  const cm = document.getElementById('centerMsg');
+  if(messages.length){ cm.textContent = messages[messages.length-1].text; cm.classList.remove('hidden'); }
+  else cm.classList.add('hidden');
+}
+function stateLabel(s){
+  return {FOLLOW:'Follow', HOLD:'Hold', MOVE:'Bergerak', BREACH:'Breach', CLEARING:'Memeriksa...'}[s]||s;
+}
+
+// ============================================================ RENDER
+function worldToScreen(x){ return x - camera.x; }
+
+function drawBuildingBase(){
+  // ambient lighting gradient instead of a flat fill
+  const bgGrad = ctx.createLinearGradient(0,0,0,VIRTUAL_H);
+  bgGrad.addColorStop(0, '#161f19');
+  bgGrad.addColorStop(0.55, '#111713');
+  bgGrad.addColorStop(1, '#080b09');
+  ctx.fillStyle = bgGrad;
+  ctx.fillRect(0,0,VIRTUAL_W,VIRTUAL_H);
+
+  // ground floor slab
+  const gY = GROUND_Y+56 - camera.x*0; // fixed screen-space, floor y doesn't scroll vertically
+  drawFloorSlab(GROUND_Y);
+  drawFloorSlab(LOFT_Y);
+
+  // rooms back walls + labels
+  for(const r of ROOMS){
+    const rx1 = worldToScreen(r.x1), rx2 = worldToScreen(r.x2);
+    if(rx2<-50 || rx1>VIRTUAL_W+50) continue;
+    const floorY = r.floor==='loft'?LOFT_Y:GROUND_Y;
+    const topY = floorY-190;
+    // back wall tone based on clear state
+    let tone = '#171f1b';
+    if(r.clearable){
+      if(r.cleared==='checking') tone='#241f14';
+      if(r.cleared==='clear') tone='#152018';
+    }
+    if(r.hidden) tone='#1c1614';
+    ctx.fillStyle = tone;
+    ctx.fillRect(rx1, topY, rx2-rx1, floorY-topY);
+
+    // room label
+    ctx.fillStyle = 'rgba(216,211,196,0.55)';
+    ctx.font = '12px Share Tech Mono, monospace';
+    ctx.fillText(r.name.toUpperCase(), rx1+10, topY+18);
+
+    // clearing indicator chip
+    if(r.clearable){
+      const chipColor = r.cleared==='clear'?'#5fae8e': r.cleared==='checking'?'#c9a24b':'#5a5f57';
+      ctx.fillStyle = chipColor;
+      ctx.beginPath();
+      ctx.arc(rx2-16, topY+14, 5, 0, Math.PI*2);
+      ctx.fill();
+    }
+  }
+
+  // ladder
+  {
+    const lx1 = worldToScreen(LADDER.x1), lx2 = worldToScreen(LADDER.x2);
+    ctx.strokeStyle = 'rgba(201,162,75,0.5)';
+    ctx.lineWidth=2;
+    for(let yy=LOFT_Y; yy<=GROUND_Y; yy+=14){
+      ctx.beginPath(); ctx.moveTo(lx1,yy); ctx.lineTo(lx2,yy); ctx.stroke();
+    }
+    ctx.beginPath(); ctx.moveTo(lx1,LOFT_Y); ctx.lineTo(lx1,GROUND_Y); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(lx2,LOFT_Y); ctx.lineTo(lx2,GROUND_Y); ctx.stroke();
+  }
+
+  // loft platform edge
+  {
+    const r = roomById('loft');
+    const x1 = worldToScreen(r.x1-20), x2 = worldToScreen(r.x2+20);
+    ctx.fillStyle = '#20281f';
+    ctx.fillRect(x1, LOFT_Y, x2-x1, 10);
+    ctx.strokeStyle = '#3a4a3a'; ctx.strokeRect(x1,LOFT_Y,x2-x1,10);
+  }
+
+  // doors
+  for(const d of DOORS){
+    const dx = worldToScreen(d.x);
+    if(dx<-40||dx>VIRTUAL_W+40) continue;
+    const topY = GROUND_Y-190;
+    if(d.state==='open'){
+      ctx.strokeStyle = 'rgba(216,211,196,0.25)';
+      ctx.setLineDash([4,4]);
+      ctx.beginPath(); ctx.moveTo(dx,topY); ctx.lineTo(dx,GROUND_Y); ctx.stroke();
+      ctx.setLineDash([]);
+    } else {
+      ctx.fillStyle = d.locked? '#5a3630' : (d.secret?'#4a3f33':'#8a6a3a');
+      ctx.fillRect(dx-4, topY+20, 8, GROUND_Y-topY-20);
+      if(d.locked){
+        ctx.fillStyle='#c9a24b';
+        ctx.font='10px Share Tech Mono, monospace';
+        ctx.fillText('🔒', dx-6, topY+14);
+      }
+    }
+  }
+
+  // cover objects
+  ctx.fillStyle = '#232b25';
+  for(const c of COVER){
+    const cx = worldToScreen(c.x);
+    if(cx<-60||cx>VIRTUAL_W+60) continue;
+    ctx.fillRect(cx-c.w/2, c.y-c.h, c.w, c.h);
+    ctx.strokeStyle='#38443a'; ctx.strokeRect(cx-c.w/2, c.y-c.h, c.w, c.h);
+  }
+
+  // evidence
+  if(!EVIDENCE.collected){
+    const ex = worldToScreen(EVIDENCE.x);
+    if(ex>-40&&ex<VIRTUAL_W+40){
+      ctx.fillStyle = '#c9a24b';
+      ctx.fillRect(ex-6, EVIDENCE.y-16, 12, 12);
+      ctx.strokeStyle='#fff5d8'; ctx.strokeRect(ex-6, EVIDENCE.y-16,12,12);
+    }
+  }
+
+  // extraction marker
+  {
+    const ex1 = worldToScreen(EXTRACTION.x1), ex2 = worldToScreen(EXTRACTION.x2);
+    ctx.fillStyle = 'rgba(95,174,142,0.12)';
+    ctx.fillRect(ex1, GROUND_Y-190, ex2-ex1, 190);
+    ctx.strokeStyle = 'rgba(95,174,142,0.5)';
+    ctx.setLineDash([6,5]);
+    ctx.strokeRect(ex1, GROUND_Y-190, ex2-ex1, 190);
+    ctx.setLineDash([]);
+    ctx.fillStyle='rgba(95,174,142,0.8)'; ctx.font='11px Share Tech Mono, monospace';
+    ctx.fillText('EKSTRAKSI', ex1+8, GROUND_Y-176);
+  }
+}
+function drawFloorSlab(y){
+  const grad = ctx.createLinearGradient(0,y,0,y+6);
+  grad.addColorStop(0,'#232c22');
+  grad.addColorStop(1,'#14180f');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, y, VIRTUAL_W, 6);
+  ctx.fillStyle = 'rgba(0,0,0,0.35)';
+  ctx.fillRect(0, y+6, VIRTUAL_W, 3);
+}
+
+// darkens (negative) or lightens (positive) a hex color by a percentage
+function shade(hex, percent){
+  hex = hex.replace('#','');
+  if(hex.length===3) hex = hex.split('').map(c=>c+c).join('');
+  const num = parseInt(hex,16);
+  let r=(num>>16)+Math.round(2.55*percent);
+  let g=((num>>8)&0xff)+Math.round(2.55*percent);
+  let b=(num&0xff)+Math.round(2.55*percent);
+  r=Math.max(0,Math.min(255,r)); g=Math.max(0,Math.min(255,g)); b=Math.max(0,Math.min(255,b));
+  return 'rgb('+r+','+g+','+b+')';
+}
+function drawGroundShadow(sx, y, w){
+  ctx.fillStyle = 'rgba(0,0,0,0.4)';
+  ctx.beginPath();
+  ctx.ellipse(sx, y, w, w*0.32, 0, 0, Math.PI*2);
+  ctx.fill();
+}
+function drawGunLine(sx, y, facing, color){
+  ctx.strokeStyle = '#12140f'; ctx.lineWidth = 3.5; ctx.lineCap='round';
+  ctx.beginPath(); ctx.moveTo(sx+facing*7, y); ctx.lineTo(sx+facing*25, y); ctx.stroke();
+  ctx.strokeStyle = color; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.moveTo(sx+facing*7, y); ctx.lineTo(sx+facing*22, y); ctx.stroke();
+  ctx.lineCap='butt';
+}
+
+function drawActor(a, color, isPlayer){
+  const sx = worldToScreen(a.x);
+  if(sx<-60||sx>VIRTUAL_W+60) return;
+  const facing = a.facing || 1;
+  const kind = isPlayer ? 'player' : 'teammate';
+
+  drawGroundShadow(sx, a.y+1, 10);
+
+  const drawn = drawSprite(kind, a, sx, a.y, facing);
+  if(!drawn){
+    // fallback: sprite belum termuat -> gambar siluet lama sebagai cadangan
+    const h = (isPlayer && a.crouching) ? 34 : 52;
+    const topY = a.y - h;
+    const legH = h*0.4, torsoH = h - legH;
+    ctx.fillStyle = shade(color,-35);
+    ctx.fillRect(sx-7, a.y-legH, 6, legH); ctx.fillRect(sx+1, a.y-legH, 6, legH);
+    ctx.fillStyle = color; ctx.fillRect(sx-9, topY, 18, torsoH);
+    ctx.fillStyle = '#caa87a';
+    ctx.beginPath(); ctx.arc(sx, topY-6, 7, 0, Math.PI*2); ctx.fill();
+    drawGunLine(sx, topY+14, facing, isPlayer? '#e8dcb0' : shade(color,20));
+  }
+
+  if(isPlayer){
+    ctx.strokeStyle = 'rgba(201,162,75,0.45)'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.ellipse(sx, a.y-30, 13, 34, 0, 0, Math.PI*2); ctx.stroke();
+  }
+}
+
+function drawCivilian(c){
+  const sx = worldToScreen(c.x);
+  if(sx<-40||sx>VIRTUAL_W+40) return;
+  const base = c.secured ? '#4a6a5a' : (c.state==='panic' ? '#c9a24b' : '#5fae8e');
+  const facing = c.facing || 1;
+
+  drawGroundShadow(sx, c.y+1, 8);
+
+  const drawn = drawSprite('civilian', c, sx, c.y, facing);
+  if(!drawn){
+    // fallback siluet lama
+    ctx.fillStyle = shade(base,-30);
+    ctx.fillRect(sx-6, c.y-20, 5, 20); ctx.fillRect(sx+1, c.y-20, 5, 20);
+    ctx.fillStyle = base; ctx.fillRect(sx-8, c.y-46, 16, 26);
+    ctx.fillStyle = '#d9b98a';
+    ctx.beginPath(); ctx.arc(sx, c.y-52, 6.5, 0, Math.PI*2); ctx.fill();
+  }
+
+  if(c.secured){
+    ctx.fillStyle='#5fae8e'; ctx.font='10px Share Tech Mono, monospace';
+    ctx.fillText('✓ AMAN', sx-16, c.y-64);
+  } else if(c.state==='panic'){
+    ctx.fillStyle='#c9a24b'; ctx.font='bold 13px sans-serif'; ctx.fillText('!', sx-2, c.y-60);
+  }
+}
+
+function drawHostile(h){
+  const sx = worldToScreen(h.x);
+  if(sx<-40||sx>VIRTUAL_W+40) return;
+  if(h.hp<=0 && h.animName!=='death') return; // sudah selesai animasi mati & dibersihkan
+  const color = h.state==='alert' ? '#b3453a' : h.state==='suspicious' ? '#c9a24b' : '#7a4a45';
+  const facing = h.facing || 1;
+
+  drawGroundShadow(sx, h.y+1, 10);
+
+  const drawn = drawSprite('hostile', h, sx, h.y, facing);
+  if(!drawn){
+    ctx.fillStyle = shade(color,-38);
+    ctx.fillRect(sx-7, h.y-22, 6, 22); ctx.fillRect(sx+1, h.y-22, 6, 22);
+    ctx.fillStyle = color; ctx.fillRect(sx-9, h.y-52, 18, 30);
+    ctx.fillStyle = shade(color,5);
+    ctx.beginPath(); ctx.arc(sx, h.y-58, 7.5, 0, Math.PI*2); ctx.fill();
+    drawGunLine(sx, h.y-38, facing, shade(color,20));
+  }
+
+  if(h.hp<=0) return; // mayat: skip ring & hp bar
+
+  // alert ring
+  if(h.state==='alert'){
+    ctx.strokeStyle='rgba(179,69,58,0.5)'; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.arc(sx, h.y-58, 11, 0, Math.PI*2); ctx.stroke();
+  }
+
+  // hp sliver only when engaged (no wallhack — only visible if within normal sight already rendered)
+  if(h.state!=='patrol'){
+    ctx.fillStyle='#1a1a1a'; ctx.fillRect(sx-14, h.y-72, 28, 4);
+    ctx.fillStyle='#b3453a'; ctx.fillRect(sx-14, h.y-72, 28*(h.hp/h.maxHp), 4);
+    ctx.strokeStyle='rgba(0,0,0,0.4)'; ctx.lineWidth=1; ctx.strokeRect(sx-14,h.y-72,28,4);
+  }
+}
+
+function drawBullets(){
+  for(const b of bullets){
+    const sx = worldToScreen(b.x);
+    ctx.fillStyle='rgba(242,230,184,0.35)';
+    ctx.fillRect(sx-7, b.y-1.5, 10, 3);
+    ctx.fillStyle='#f2e6b8';
+    ctx.fillRect(sx-4, b.y-1, 8, 2);
+  }
+}
+function drawParticles(){
+  for(const p of particles){
+    const sx = worldToScreen(p.x);
+    if(p.kind==='muzzle'){
+      const g = ctx.createRadialGradient(sx,p.y,0,sx,p.y,6);
+      g.addColorStop(0,'rgba(255,240,200,0.95)');
+      g.addColorStop(1,'rgba(255,180,90,0)');
+      ctx.fillStyle=g; ctx.beginPath(); ctx.arc(sx,p.y,6,0,Math.PI*2); ctx.fill();
+    }
+    if(p.kind==='hit'){
+      const g = ctx.createRadialGradient(sx,p.y,0,sx,p.y,7);
+      g.addColorStop(0,'rgba(255,150,110,0.9)');
+      g.addColorStop(1,'rgba(179,69,58,0)');
+      ctx.fillStyle=g; ctx.beginPath(); ctx.arc(sx,p.y,7,0,Math.PI*2); ctx.fill();
+    }
+  }
+}
+function drawSoundRipples(){
+  ctx.strokeStyle='rgba(216,211,196,0.15)';
+  for(const s of soundEvents){
+    const sx = worldToScreen(s.x);
+    const r = s.radius*(1-s.t/0.9);
+    ctx.beginPath(); ctx.arc(sx, GROUND_Y-30, Math.max(4,r*0.3), 0, Math.PI*2); ctx.stroke();
+  }
+}
+
+function render(){
+  if(gameState!=='PLAYING' && gameState!=='PAUSED'){
+    return;
+  }
+  // reset then scale so all draw calls below can use fixed VIRTUAL_W x
+  // VIRTUAL_H logical coordinates regardless of actual canvas pixel size.
+  ctx.setTransform(renderScale, 0, 0, renderScale, 0, 0);
+  drawBuildingBase();
+  drawSoundRipples();
+  civilians.forEach(drawCivilian);
+  hostiles.forEach(drawHostile);
+  teammates.forEach(t=> drawActor(t, t.alive? '#5c8fb0' : '#3a3f3a', false));
+  drawActor(player, '#d8d3c4', true);
+  drawBullets();
+  drawParticles();
+  drawVignette();
+}
+function drawVignette(){
+  const g = ctx.createRadialGradient(
+    VIRTUAL_W/2, VIRTUAL_H*0.55, VIRTUAL_H*0.25,
+    VIRTUAL_W/2, VIRTUAL_H*0.55, VIRTUAL_H*0.85
+  );
+  g.addColorStop(0, 'rgba(0,0,0,0)');
+  g.addColorStop(1, 'rgba(0,0,0,0.45)');
+  ctx.fillStyle = g;
+  ctx.fillRect(0,0,VIRTUAL_W,VIRTUAL_H);
+}
+
+// ============================================================ MAIN LOOP
+function loop(now){
+  const dt = Math.min(0.033, (now-last)/1000);
+  last = now;
+  update(dt);
+  render();
+  requestAnimationFrame(loop);
+}
+// Mulai memuat sprite sheet secara paralel — game tetap bisa berjalan
+// (dengan siluet cadangan) selagi PNG masih diunduh, lalu otomatis
+// beralih ke sprite begitu selesai dimuat.
+loadSprites();
+requestAnimationFrame(loop);
+
+})();
+</script>
+</body>
+</html>
